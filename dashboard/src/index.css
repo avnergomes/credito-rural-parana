@@ -13,11 +13,22 @@ body {
 
 /* Chart container */
 .chart-container {
-  @apply bg-white rounded-xl shadow-card p-4 md:p-6;
+  @apply bg-white rounded-xl shadow-card p-4 md:p-6 overflow-hidden;
 }
 
 .chart-container h3 {
   @apply text-lg font-semibold text-dark-800 mb-4;
+}
+
+/* Sankey chart specific */
+.chart-container .nivo-sankey {
+  overflow: visible;
+}
+
+/* Ensure SVG charts don't overflow */
+.chart-container svg {
+  display: block;
+  max-width: 100%;
 }
 
 /* Custom scrollbar */

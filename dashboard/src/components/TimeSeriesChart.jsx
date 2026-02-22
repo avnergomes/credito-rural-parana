@@ -26,22 +26,26 @@ export default function TimeSeriesChart({
   stacked = true,
   showBrush = true,
   onAnoClick,
-  selectedAno
+  selectedAno,
+  granularidade = 'anual'
 }) {
   const chartData = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
 
-    // Group by year/month and aggregate
+    // Group by year or year/month based on granularidade
     const grouped = {};
 
     data.forEach(item => {
-      const key = item.mes ? `${item.ano}-${String(item.mes).padStart(2, '0')}` : String(item.ano);
+      // Se granularidade é anual, agrupa só por ano
+      const key = granularidade === 'mensal' && item.mes
+        ? `${item.ano}-${String(item.mes).padStart(2, '0')}`
+        : String(item.ano);
 
       if (!grouped[key]) {
         grouped[key] = {
           periodo: key,
           ano: item.ano,
-          mes: item.mes,
+          mes: granularidade === 'mensal' ? item.mes : null,
           custeio: 0,
           investimento: 0,
           comercializacao: 0,
@@ -67,7 +71,7 @@ export default function TimeSeriesChart({
       if (a.ano !== b.ano) return a.ano - b.ano;
       return (a.mes || 0) - (b.mes || 0);
     });
-  }, [data]);
+  }, [data, granularidade]);
 
   const formatLabel = (value) => {
     if (typeof value === 'string' && value.includes('-')) {
@@ -107,8 +111,8 @@ export default function TimeSeriesChart({
   if (!chartData.length) {
     return (
       <div className="chart-container">
-        <h3>{title}</h3>
-        <div className="h-64 flex items-center justify-center text-dark-400">
+        <h3 className="text-lg font-semibold text-dark-800 mb-4">{title}</h3>
+        <div className="h-64 flex items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
           Nenhum dado disponivel
         </div>
       </div>
@@ -117,7 +121,7 @@ export default function TimeSeriesChart({
 
   return (
     <div className="chart-container">
-      <h3>{title}</h3>
+      <h3 className="text-lg font-semibold text-dark-800 mb-4">{title}</h3>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart
