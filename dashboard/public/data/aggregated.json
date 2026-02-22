@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "anoMin": 2013,
+    "anoMax": 2024,
+    "totalMunicipios": 399,
+    "totalContratos": 0,
+    "totalValor": 0,
+    "totalArea": 0,
+    "ultimaAtualizacao": "2025-02-22",
+    "periodoMaisRecente": "2024-12"
+  },
+  "filters": {
+    "finalidades": ["CUSTEIO", "INVESTIMENTO", "COMERCIALIZACAO"],
+    "programas": ["PRONAF", "PRONAMP", "DEMAIS"]
+  },
+  "byAno": [
+    {"ano": 2020, "valor": 25000000000, "contratos": 150000, "area": 5000000},
+    {"ano": 2021, "valor": 28000000000, "contratos": 160000, "area": 5200000},
+    {"ano": 2022, "valor": 32000000000, "contratos": 175000, "area": 5500000},
+    {"ano": 2023, "valor": 35000000000, "contratos": 180000, "area": 5800000},
+    {"ano": 2024, "valor": 38000000000, "contratos": 190000, "area": 6000000}
+  ],
+  "byMes": [],
+  "byFinalidade": [
+    {"ano": 2024, "finalidade": "CUSTEIO", "valor": 25000000000, "contratos": 120000, "area": 4000000},
+    {"ano": 2024, "finalidade": "INVESTIMENTO", "valor": 10000000000, "contratos": 50000, "area": 1500000},
+    {"ano": 2024, "finalidade": "COMERCIALIZACAO", "valor": 3000000000, "contratos": 20000, "area": 500000}
+  ],
+  "byPrograma": [
+    {"programa": "PRONAF", "valor": 15000000000, "contratos": 100000, "area": 2000000},
+    {"programa": "PRONAMP", "valor": 8000000000, "contratos": 40000, "area": 1500000},
+    {"programa": "DEMAIS", "valor": 15000000000, "contratos": 50000, "area": 2500000}
+  ],
+  "byProduto": [
+    {"produto": "SOJA", "valor": 12000000000, "contratos": 50000, "area": 2000000},
+    {"produto": "MILHO", "valor": 8000000000, "contratos": 40000, "area": 1500000},
+    {"produto": "TRIGO", "valor": 4000000000, "contratos": 25000, "area": 800000},
+    {"produto": "FRANGO DE CORTE", "valor": 3500000000, "contratos": 15000, "area": 0},
+    {"produto": "BOVINOS", "valor": 3000000000, "contratos": 20000, "area": 500000}
+  ],
+  "byMunicipio": [
+    {"codMunic": "4104808", "municipio": "CASCAVEL", "valor": 2000000000, "contratos": 8000, "area": 300000},
+    {"codMunic": "4118204", "municipio": "MARINGA", "valor": 1500000000, "contratos": 6000, "area": 250000},
+    {"codMunic": "4127700", "municipio": "TOLEDO", "valor": 1400000000, "contratos": 5500, "area": 220000}
+  ],
+  "byGenero": {
+    "masculino": 30000000000,
+    "feminino": 8000000000
+  },
+  "byTipoPessoa": {
+    "pf": 35000000000,
+    "pj": 3000000000
+  },
+  "sankey": {
+    "nodes": [],
+    "links": []
+  },
+  "bump": []
+}

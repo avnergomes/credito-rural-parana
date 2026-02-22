@@ -1,0 +1,759 @@
+# PROMPT PARA CLAUDE CODE — DASHBOARD CRÉDITO RURAL PARANÁ
+# Repositório: avnergomes/credito-rural-parana
+# Deploy: GitHub Pages
+# Integração: ecossistema DataGeo Paraná (datageoparana.github.io)
+
+---
+
+## 1. CONTEXTO DO PROJETO
+
+Você vai criar um dashboard interativo chamado **"Crédito Rural Paraná"**, novo módulo do
+ecossistema DataGeo Paraná. Ele visualiza dados de crédito rural do Paraná obtidos via API
+pública do Banco Central do Brasil (BCB/SICOR).
+
+**IMPORTANTE**: Antes de codar qualquer coisa, estude os repositórios de referência abaixo
+para replicar EXATAMENTE os mesmos padrões de arquitetura, componentes, layout e estilo.
+
+### 1.1 Repositórios de referência (ESTUDAR TODOS ANTES DE COMEÇAR)
+
+```
+avnergomes/vbp-parana           ← dashboard principal, padrão-ouro
+avnergomes/comexstat-parana     ← tem SankeyChart, WorldMap, ConnectionMap, ChordDiagram
+avnergomes/precos-florestais    ← tem ForecastChart, ForecastPanel, TreemapChart, LollipopChart
+avnergomes/precos-diarios       ← tem RidgelineChart, SeasonalHeatmap, CircularBarChart
+avnergomes/emprego-agro-parana  ← tem BumpChart, CircularBarChart, LollipopChart
+avnergomes/precos-de-terras     ← tem RadarChart, PriceSearch, ClasseLegend
+```
+
+Clone e estude cada um deles. Preste atenção em:
+- Estrutura de pastas (tudo dentro de `dashboard/`)
+- Padrão do App.jsx (layout vertical, sem sidebar)
+- Componentes reutilizáveis (Header, Footer, Filters, Tabs, KpiCards, ActiveFilters, Loading)
+- Hooks customizados (useData.js)
+- Utils (format.js)
+- Configs (tailwind.config.js, vite.config.js)
+- Workflows (.github/workflows/)
+- Como os dados são processados (scripts/)
+
+### 1.2 Stack EXATA (não alterar)
+
+| Camada | Tecnologia | Versão |
+|---|---|---|
+| Framework | React | ^18.2 |
+| Build | Vite | ^5.0 |
+| CSS | Tailwind CSS | ^3.3 |
+| Gráficos básicos | Recharts | ^2.10 |
+| Gráficos avançados | D3.js | ^7.9 |
+| Sankey | @nivo/sankey + @nivo/core | ^0.84 |
+| Mapas | Leaflet + React-Leaflet | ^1.9 / ^4.2 |
+| Ícones | Lucide React | ^0.294 |
+| ETL/Dados | Python (Pandas, NumPy) | 3.12 |
+| Forecasting | XGBoost, LightGBM, scikit-learn | offline, via script |
+| Deploy | GitHub Pages | via Actions |
+
+**NÃO usar**: Flask, backend, API externa, Streamlit, Next.js, ou qualquer coisa que não
+esteja nos repos de referência.
+
+---
+
+## 2. ESTRUTURA DE PASTAS (PADRÃO OBRIGATÓRIO)
+
+```
+credito-rural-parana/
+├── .github/
+│   └── workflows/
+│       ├── deploy.yml              ← deploy GitHub Pages (copiar padrão comexstat)
+│       └── data-pipeline.yml       ← ETL: fetch API + process + forecast
+├── .gitignore
+├── README.md
+├── dashboard/                      ← TODO o React app fica AQUI DENTRO
+│   ├── index.html
+│   ├── package.json
+│   ├── package-lock.json
+│   ├── postcss.config.js
+│   ├── tailwind.config.js          ← copiar paleta do comexstat-parana
+│   ├── vite.config.js              ← base: '/credito-rural-parana/'
+│   ├── public/
+│   │   ├── .nojekyll
+│   │   ├── 404.html
+│   │   ├── favicon.svg
+│   │   ├── robots.txt
+│   │   ├── sitemap.xml
+│   │   ├── assets/
+│   │   │   ├── logo.png
+│   │   │   └── og-image.png
+│   │   └── data/                   ← JSONs processados pelo ETL
+│   │       ├── aggregated.json     ← totais, rankings, metadados
+│   │       ├── detailed.json       ← dados granulares (município × produto × mês)
+│   │       ├── forecasts.json      ← previsões pré-geradas offline
+│   │       ├── municipios.geojson  ← GeoJSON 399 municípios PR
+│   │       └── mapeamento_vbp.json ← de-para produtos BCB → categorias VBP
+│   └── src/
+│       ├── main.jsx
+│       ├── index.css
+│       ├── App.jsx                 ← layout principal (SEGUIR PADRÃO VBP/COMEXSTAT)
+│       ├── hooks/
+│       │   └── useData.js          ← fetch JSONs + filtros
+│       ├── utils/
+│       │   └── format.js           ← formatNumber, formatCurrency, formatPercent
+│       └── components/
+│           ├── Header.jsx          ← header com gradiente, título, stats rápidos
+│           ├── Footer.jsx          ← fontes, links ecossistema, créditos
+│           ├── Loading.jsx         ← skeleton/spinner
+│           ├── Filters.jsx         ← filtros HORIZONTAIS (NÃO sidebar)
+│           ├── ActiveFilters.jsx   ← badges clicáveis dos filtros ativos
+│           ├── Tabs.jsx            ← navegação por abas
+│           ├── KpiCards.jsx        ← cards KPI com ícones Lucide
+│           ├── TimeSeriesChart.jsx ← Recharts LineChart/AreaChart
+│           ├── MapChart.jsx        ← Leaflet mapa coroplético
+│           ├── SankeyChart.jsx     ← @nivo/sankey (padrão comexstat)
+│           ├── TreemapChart.jsx    ← D3 treemap (padrão precos-florestais)
+│           ├── BumpChart.jsx       ← D3 bump chart (padrão emprego-agro)
+│           ├── ScatterChart.jsx    ← Recharts scatter VBP × Crédito
+│           ├── LollipopChart.jsx   ← D3 lollipop (padrão precos-florestais)
+│           ├── DistributionCharts.jsx ← donuts e barras (gênero, PF/PJ, faixas)
+│           ├── ForecastChart.jsx   ← Recharts com intervalos confiança
+│           ├── ForecastPanel.jsx   ← seletor de série + modelo + tabela
+│           ├── ProductTable.jsx    ← tabela com filtros e export
+│           └── RankingTable.jsx    ← ranking municípios/produtos
+├── data/                           ← dados brutos (NÃO processados)
+│   └── raw/                        ← cache dos downloads da API BCB
+└── scripts/
+    ├── requirements.txt            ← pandas, numpy, requests, tqdm, xgboost, lightgbm, scikit-learn
+    ├── fetch_data.py               ← download dos dados da API SICOR
+    ├── preprocess_data.py          ← limpeza, agregação, geração dos JSONs
+    └── generate_forecasts.py       ← previsões offline → forecasts.json
+```
+
+---
+
+## 3. LAYOUT DO DASHBOARD (PADRÃO VERTICAL, SEM SIDEBAR)
+
+O layout segue EXATAMENTE o padrão dos outros dashboards. Fluxo vertical:
+
+```
+┌──────────────────────────────────────────────────────┐
+│ HEADER                                                │
+│ Gradiente colorido | Título | Stats rápidos           │
+│ (período, nº municípios, total R$, nº contratos)     │
+├──────────────────────────────────────────────────────┤
+│ FILTERS (horizontal, inline, NÃO é sidebar)          │
+│ [Período ▼] [Finalidade ▼] [Programa ▼] [Produto ▼] │
+│ [Município ▼] [Granularidade: Mensal/Anual]          │
+│ [Toggle: Compatibilizar VBP]                         │
+├──────────────────────────────────────────────────────┤
+│ ACTIVE FILTERS (badges clicáveis para remover)       │
+│ Filtros ativos: [Custeio ×] [Soja ×]  [Limpar todos]│
+├──────────────────────────────────────────────────────┤
+│ KPI CARDS (grid 5 colunas em desktop)                │
+│ ┌────┐ ┌────┐ ┌────┐ ┌────┐ ┌────┐                 │
+│ │R$bi│ │Nºctr│ │ ha │ │R$/ha│ │ Δ% │                 │
+│ └────┘ └────┘ └────┘ └────┘ └────┘                 │
+├──────────────────────────────────────────────────────┤
+│ TABS                                                  │
+│ [Visão Geral] [Programas] [Municípios] [Produtos]    │
+│ [Mapa] [Previsões]                                    │
+├──────────────────────────────────────────────────────┤
+│ TAB CONTENT (muda conforme aba selecionada)          │
+│                                                       │
+│ (ver detalhamento por aba abaixo)                    │
+│                                                       │
+├──────────────────────────────────────────────────────┤
+│ FOOTER                                                │
+│ Fonte: BCB/SICOR | Links ecossistema | Créditos      │
+└──────────────────────────────────────────────────────┘
+```
+
+### 3.1 Conteúdo de cada aba
+
+#### Aba "Visão Geral"
+```
+TimeSeriesChart — evolução mensal/anual do crédito (custeio, investimento, comercialização)
+  └─ Recharts AreaChart empilhado com brush para zoom temporal
+
+grid 1×2:
+  ├─ SankeyChart — fluxo: Programa → Finalidade → Top 10 Produtos (@nivo/sankey)
+  └─ TreemapChart — composição: Programa > Finalidade > Produto (D3 treemap)
+
+grid 1×2:
+  ├─ DistributionCharts — Donut gênero (M/F) + Donut tipo pessoa (PF/PJ) (Recharts PieChart)
+  └─ LollipopChart — Top 15 produtos por valor (D3 lollipop)
+```
+
+#### Aba "Programas"
+```
+BarChart horizontal — Valor por programa (Pronaf, Pronamp, demais)
+TimeSeriesChart — Evolução por programa ao longo dos anos
+LollipopChart — Subprogramas por valor
+BarChart — Fonte de recursos (obrigatórios, livres, BNDES, etc.)
+BarChart — Top 10 instituições financeiras
+```
+
+#### Aba "Municípios"
+```
+BumpChart — Ranking Top 20 municípios ao longo dos anos (D3, padrão emprego-agro)
+RankingTable — Tabela ranking completa com busca
+  └─ Colunas: posição, município, valor, contratos, área, R$/ha, variação
+```
+
+#### Aba "Produtos"
+```
+RankingTable — Ranking de produtos por valor, contratos, área
+BarChart — Distribuição por faixa de valor dos contratos
+ScatterChart — VBP × Crédito por município (Recharts ScatterChart)
+  └─ Toggle ON/OFF compatibilização VBP
+  └─ Eixo X: VBP do município | Eixo Y: Crédito total
+  └─ Tamanho bolha: área financiada
+  └─ Cor: finalidade predominante
+  └─ Linha de tendência com R²
+```
+
+#### Aba "Mapa"
+```
+MapChart — Mapa coroplético Leaflet dos 399 municípios
+  └─ Seletor: colorir por valor total | nº contratos | R$/ha | área financiada
+  └─ Escala quantize com 7 classes (d3.scaleQuantize)
+  └─ Tooltip: município, valor, contratos, ranking, principal produto
+  └─ Legenda interativa
+  └─ Zoom + pan
+```
+
+#### Aba "Previsões"
+```
+ForecastPanel — Seletor de série + modelo (padrão precos-florestais)
+  └─ Série: Total PR | Por finalidade | Por produto (top 10)
+  └─ Modelo: XGBoost | LightGBM | RandomForest
+ForecastChart — Recharts com histórico + previsão + intervalos de confiança
+  └─ Área sombreada para IC 80% e 95%
+  └─ Horizonte: até 24 meses
+ForecastKpis — KPIs do forecast (tendência, MAPE, próximo mês)
+ForecastTable — Tabela com valores previstos mês a mês
+```
+
+---
+
+## 4. FONTE DE DADOS — API BCB/SICOR (OData)
+
+### 4.1 Base URL
+```
+https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata/{RECURSO}?$format=json&$filter=Uf eq 'PR'
+```
+
+### 4.2 Endpoints a utilizar
+
+| Endpoint | Uso no dashboard |
+|---|---|
+| `CusteioMunicipioProduto` | Custeio por município e produto |
+| `InvestMunicipioProduto` | Investimento por município e produto |
+| `ComercRegiaoUFProduto` | Comercialização por produto |
+| `CusteioRegiaoUFProduto` | Custeio agregado por produto |
+| `InvestRegiaoUFProduto` | Investimento agregado por produto |
+| `RegiaoUF` | Totais por UF |
+| `RegiaoUFGenero` | Por gênero do tomador |
+| `ProgramaSubprograma` | Por programa (Pronaf, Pronamp, etc.) |
+| `ProgramaSubprogramaRegiaoUF` | Programa × UF (filtrar PR) |
+| `Faixa` | Por faixa de valor do contrato |
+| `FaixaUF` | Faixa × UF (filtrar PR) |
+| `FonteRecursos` | Por fonte de recursos |
+| `FonteRecursosIF` | Fonte × instituição financeira |
+| `SegmentoIF` | Por segmento e IF |
+| `SegmentoIFRegiaoUF` | Segmento × IF × UF |
+| `SegmentoTipoPessoa` | PF vs PJ |
+
+### 4.3 Campos típicos retornados
+```json
+{
+  "AnoEmissao": "2024",
+  "MesEmissao": "01",
+  "codMunic": "4106902",
+  "Municipio": "CURITIBA",
+  "Uf": "PR",
+  "Produto": "SOJA",
+  "Atividade": "AGRICULTURA",
+  "QtdContrato": 150,
+  "VlContrato": 45000000.00,
+  "AreaFinanciada": 12000.00
+}
+```
+
+### 4.4 Estratégia de coleta (fetch_data.py)
+```python
+# Pseudocódigo:
+# 1. Para cada endpoint:
+#    a. URL = base + endpoint + "?$format=json&$filter=Uf eq 'PR'&$top=10000"
+#    b. Paginar com $skip até não ter mais dados
+#    c. Retry com backoff exponencial (API pode ser lenta)
+#    d. Intervalo de 1s entre requests
+#    e. Salvar raw em data/raw/{endpoint}.json
+# 2. Log progresso com tqdm
+```
+
+### 4.5 Processamento (preprocess_data.py)
+```python
+# Gerar dois JSONs principais (padrão do ecossistema):
+
+# aggregated.json — estrutura:
+{
+  "metadata": {
+    "anoMin": 2013,
+    "anoMax": 2024,
+    "totalMunicipios": 399,
+    "totalContratos": ...,
+    "totalValor": ...,
+    "totalArea": ...,
+    "ultimaAtualizacao": "2024-12-01",
+    "periodoMaisRecente": "2024-10"
+  },
+  "byAno": [...],
+  "byMes": [...],
+  "byFinalidade": [...],
+  "byPrograma": [...],
+  "byProduto": [...],  # ranking por valor
+  "byMunicipio": [...],  # ranking por valor
+  "byGenero": {...},
+  "byTipoPessoa": {...},
+  "byFaixaValor": [...],
+  "byFonteRecursos": [...],
+  "byInstituicao": [...],  # top 20
+  "bySegmento": [...],
+  "sankey": {  # pré-processado para @nivo/sankey
+    "nodes": [...],
+    "links": [...]
+  },
+  "treemap": {...},  # pré-processado para D3 treemap
+  "bump": [...]  # ranking municípios por ano para bump chart
+}
+
+# detailed.json — estrutura:
+[
+  {
+    "ano": 2024, "mes": 1,
+    "municipio": "CURITIBA", "codMunic": "4106902",
+    "finalidade": "CUSTEIO",
+    "programa": "PRONAF",
+    "produto": "SOJA",
+    "contratos": 150, "valor": 45000000, "area": 12000
+  },
+  ...
+]
+
+# mapeamento_vbp.json — de-para:
+{
+  "SOJA": "Soja",
+  "MILHO": "Milho",
+  "MILHO SAFRINHA": "Milho",
+  "TRIGO": "Trigo",
+  "CAFE": "Café",
+  "CAFE ARABICA": "Café",
+  "CANA DE ACUCAR": "Cana-de-Açúcar",
+  "FEIJAO": "Feijão",
+  "MANDIOCA": "Mandioca",
+  "FRANGO DE CORTE": "Frango de Corte",
+  "BOVINOS": "Bovinos",
+  "SUINOS": "Suínos",
+  "LEITE": "Leite",
+  ...
+}
+# Este mapeamento deve incluir TODOS os produtos que aparecem nos dados do PR.
+# Produtos sem match ficam como "Outros".
+```
+
+### 4.6 Forecasting (generate_forecasts.py)
+
+**SEGUIR EXATAMENTE o padrão de precos-florestais/scripts/generate_forecasts.py**
+
+- Modelos: XGBoost, LightGBM, RandomForestRegressor
+- Gerar previsões offline para combinações de filtros:
+  - Total PR
+  - Por finalidade (custeio, investimento, comercialização)
+  - Por produto (top 10 produtos)
+- Horizonte: 24 meses
+- Features: lag features (1,2,3,6,12 meses), médias móveis, sazonalidade (mês), tendência
+- Output: `dashboard/public/data/forecasts.json`
+- Estrutura do JSON de forecasts: seguir o mesmo formato de precos-florestais
+
+---
+
+## 5. SISTEMA DE FILTROS
+
+### 5.1 Filtros dropdown (componente Filters.jsx, horizontal)
+```javascript
+const [filters, setFilters] = useState({
+  anos: [2013, 2024],           // range slider ou dual select
+  granularidade: 'anual',       // toggle: 'mensal' | 'anual'
+  finalidades: [],              // multi-select: Custeio, Investimento, Comercialização
+  programas: [],                // multi-select: Pronaf, Pronamp, Demais
+  produtos: [],                 // multi-select com busca (muitos produtos)
+  municipios: [],               // multi-select com busca (399 municípios)
+  instituicoes: [],             // multi-select: bancos
+  generos: [],                  // multi-select: Masculino, Feminino
+  faixasValor: [],              // multi-select: faixas BCB
+  segmentos: [],                // multi-select
+  compatibilizarVBP: false,     // toggle on/off
+});
+```
+
+### 5.2 Filtros interativos (click nos gráficos, componente ActiveFilters.jsx)
+```javascript
+const [interactiveFilters, setInteractiveFilters] = useState({
+  finalidade: null,
+  programa: null,
+  produto: null,
+  municipio: null,
+  ano: null,
+});
+```
+
+Seguir o padrão de merge de filtros do VBP Paraná (mergedFilters).
+
+---
+
+## 6. COMPONENTES — ESPECIFICAÇÕES
+
+### 6.1 Header.jsx
+- Gradiente: `from-primary-700 via-primary-600 to-accent-600`
+- Ícone: `Banknote` ou `Landmark` do Lucide
+- Título: "Crédito Rural Paraná"
+- Subtítulo: "Financiamento Agropecuário — BCB/SICOR"
+- Stats rápidos: Período, Municípios, Total R$, Contratos
+- **Copiar estrutura exata do Header.jsx do comexstat-parana**
+
+### 6.2 KpiCards.jsx
+5 cards com ícones Lucide:
+- Valor total contratado (R$ bi) — `DollarSign`
+- Nº de contratos — `FileText`
+- Área financiada (ha) — `MapPin`
+- Valor médio por contrato (R$) — `Calculator`
+- Variação YoY (%) — `TrendingUp` / `TrendingDown`
+
+### 6.3 Tabs.jsx
+```javascript
+const TABS = [
+  { id: 'visao-geral', label: 'Visão Geral', icon: 'LayoutDashboard' },
+  { id: 'programas', label: 'Programas', icon: 'PieChart' },
+  { id: 'municipios', label: 'Municípios', icon: 'MapPin' },
+  { id: 'produtos', label: 'Produtos', icon: 'Package' },
+  { id: 'mapa', label: 'Mapa', icon: 'Globe' },
+  { id: 'previsoes', label: 'Previsões', icon: 'TrendingUp' },
+];
+```
+**Copiar Tabs.jsx do comexstat-parana exatamente.**
+
+### 6.4 Footer.jsx
+- Fonte: BCB/SICOR — Banco Central do Brasil
+- Links: API SICOR, Portal Dados Abertos BCB
+- Ecossistema: links para outros dashboards (VBP, ComexStat, etc.)
+- Última atualização dos dados
+- **Copiar estrutura do Footer.jsx do comexstat-parana, mudar fontes**
+
+### 6.5 MapChart.jsx
+- Leaflet + React-Leaflet
+- GeoJSON dos 399 municípios (mesmo usado no vbp-parana e precos-de-terras)
+- Join pelo código IBGE do município
+  - ATENÇÃO: código BCB pode ser 7 dígitos, GeoJSON IBGE pode ser 6 — verificar e converter
+- Escala: d3.scaleQuantize, 7 classes
+- **Copiar base do MapChart.jsx do vbp-parana ou precos-de-terras**
+
+### 6.6 SankeyChart.jsx
+- Usar @nivo/sankey (já usado no comexstat-parana)
+- **Copiar SankeyChart.jsx do comexstat-parana como base**
+- Fluxo: Programa → Finalidade → Top 10 Produtos
+
+### 6.7 BumpChart.jsx
+- D3.js custom
+- **Copiar BumpChart.jsx do emprego-agro-parana como base**
+- Top 20 municípios, eixo X = anos
+
+### 6.8 TreemapChart.jsx
+- D3.js
+- **Copiar TreemapChart.jsx do precos-florestais como base**
+- Hierarquia: Programa > Finalidade > Produto
+
+### 6.9 ForecastChart.jsx + ForecastPanel.jsx
+- **Copiar do precos-florestais como base**
+- Adaptar seletores para: série (total/finalidade/produto) e modelo (XGB/LGBM/RF)
+
+### 6.10 ScatterChart.jsx (NOVO — VBP × Crédito)
+- Recharts ScatterChart
+- Toggle compatibilização VBP (on/off)
+- Quando ON: agrupar produtos pelo mapeamento_vbp.json
+- Tooltip: município, VBP, crédito, área financiada
+- Linha de tendência com R² (calcular no frontend)
+
+---
+
+## 7. CONFIGURAÇÕES
+
+### 7.1 vite.config.js
+```javascript
+import { defineConfig } from 'vite'
+import react from '@vitejs/plugin-react'
+
+export default defineConfig({
+  plugins: [react()],
+  base: '/credito-rural-parana/',
+  build: {
+    outDir: 'dist',
+    sourcemap: false
+  }
+})
+```
+
+### 7.2 tailwind.config.js
+**Copiar EXATAMENTE do comexstat-parana**, ajustando primary para tons financeiros se desejado
+(ou manter as mesmas cores para consistência do ecossistema).
+
+### 7.3 package.json
+```json
+{
+  "name": "credito-rural-parana-dashboard",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@nivo/core": "^0.84.0",
+    "@nivo/sankey": "^0.84.0",
+    "d3": "^7.9.0",
+    "leaflet": "^1.9.4",
+    "lucide-react": "^0.294.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-leaflet": "^4.2.1",
+    "recharts": "^2.10.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.43",
+    "@types/react-dom": "^18.2.17",
+    "@vitejs/plugin-react": "^4.2.1",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32",
+    "tailwindcss": "^3.3.6",
+    "vite": "^5.0.8"
+  }
+}
+```
+
+### 7.4 scripts/requirements.txt
+```
+requests>=2.31
+pandas>=2.2
+numpy>=1.26
+tqdm>=4.66
+xgboost>=2.0
+lightgbm>=4.0
+scikit-learn>=1.4
+```
+
+---
+
+## 8. GITHUB ACTIONS WORKFLOWS
+
+### 8.1 deploy.yml
+**Copiar EXATAMENTE do comexstat-parana** (já está perfeito).
+
+### 8.2 data-pipeline.yml
+```yaml
+name: Data Pipeline - Crédito Rural
+
+on:
+  schedule:
+    - cron: '0 6 5 * *'     # Dia 5 de cada mês às 6h UTC
+  workflow_dispatch:
+    inputs:
+      generate_forecasts:
+        description: 'Gerar previsões'
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30       # API BCB pode ser lenta
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Fetch data from BCB API
+        run: python scripts/fetch_data.py
+
+      - name: Process data
+        run: python scripts/preprocess_data.py
+
+      - name: Generate forecasts
+        if: ${{ inputs.generate_forecasts != false }}
+        run: python scripts/generate_forecasts.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          git add -A
+          if git diff --staged --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: atualização mensal dados crédito rural $(date +%Y-%m)
+
+          Dados atualizados automaticamente pelo pipeline.
+
+          Co-Authored-By: GitHub Actions <noreply@github.com>"
+          git push
+```
+
+---
+
+## 9. PALETA DE CORES (SUGESTÃO PARA CRÉDITO RURAL)
+
+Manter consistência com o ecossistema mas diferenciar o tema financeiro:
+
+```javascript
+// Para o SankeyChart e gráficos de finalidade:
+const FINALIDADE_COLORS = {
+  'CUSTEIO': '#2563EB',          // azul
+  'INVESTIMENTO': '#16A34A',      // verde
+  'COMERCIALIZAÇÃO': '#F59E0B',   // âmbar
+  'INDUSTRIALIZAÇÃO': '#8B5CF6',  // roxo
+};
+
+// Para programas:
+const PROGRAMA_COLORS = {
+  'PRONAF': '#8B5CF6',      // roxo
+  'PRONAMP': '#06B6D4',     // ciano
+  'DEMAIS': '#F97316',      // laranja
+};
+```
+
+---
+
+## 10. ORDEM DE IMPLEMENTAÇÃO
+
+### Fase 1: Infraestrutura + ETL
+1. Criar repositório com estrutura de pastas completa
+2. Configurar dashboard/ (Vite + React + Tailwind, copiar configs)
+3. Implementar `scripts/fetch_data.py` — download completo API SICOR
+4. Implementar `scripts/preprocess_data.py` — gerar aggregated.json + detailed.json
+5. Executar ETL localmente para ter dados de trabalho
+6. Copiar municipios.geojson de outro repo
+
+### Fase 2: Layout + Componentes Base
+7. Header.jsx, Footer.jsx, Loading.jsx (copiar e adaptar de comexstat)
+8. Filters.jsx (horizontal, com todos os filtros)
+9. ActiveFilters.jsx (copiar de comexstat/vbp)
+10. Tabs.jsx (copiar de comexstat)
+11. KpiCards.jsx
+12. useData.js + format.js
+
+### Fase 3: Aba Visão Geral
+13. TimeSeriesChart.jsx — evolução temporal
+14. SankeyChart.jsx — copiar de comexstat, adaptar dados
+15. TreemapChart.jsx — copiar de precos-florestais, adaptar
+16. DistributionCharts.jsx — donuts + barras
+17. LollipopChart.jsx — copiar de precos-florestais
+
+### Fase 4: Demais Abas
+18. Aba Programas (barras, timeseries, lollipop, IF ranking)
+19. Aba Municípios (BumpChart — copiar de emprego-agro + RankingTable)
+20. Aba Produtos (RankingTable + Faixa + ScatterChart VBP×Crédito)
+21. Aba Mapa (MapChart — copiar de vbp/precos-de-terras)
+
+### Fase 5: Previsões
+22. `scripts/generate_forecasts.py` — copiar padrão precos-florestais
+23. ForecastChart.jsx + ForecastPanel.jsx — copiar de precos-florestais
+24. Integrar na aba Previsões
+
+### Fase 6: Polish + Deploy
+25. GitHub Actions (deploy.yml + data-pipeline.yml)
+26. Responsividade mobile
+27. Performance (lazy loading seções, useMemo)
+28. README.md
+29. Deploy no GitHub Pages
+30. Testar pipeline mensal
+
+---
+
+## 11. NOTAS IMPORTANTES
+
+### 11.1 Defasagem dos dados
+A API BCB/SICOR tem defasagem de ~2-3 meses.
+Mostrar no Header e Footer: "Dados atualizados até MM/AAAA".
+
+### 11.2 Volume de dados
+Os JSONs podem ser grandes (399 municípios × 12 meses × 10+ anos × N produtos).
+- detailed.json pode ter dezenas de MB
+- Usar chaves curtas nos JSONs
+- Implementar lazy loading por aba (não carregar detailed.json até precisar)
+
+### 11.3 Código IBGE
+- BCB usa codMunic com 7 dígitos (ex: 4106902 = Curitiba)
+- GeoJSON IBGE pode ter 6 ou 7 dígitos — verificar e converter se necessário
+- Criar lookup table no preprocess_data.py
+
+### 11.4 Compatibilização VBP
+- Toggle OFF: produtos como vêm do BCB
+- Toggle ON: agrupar usando mapeamento_vbp.json
+- Atualizar todos os gráficos quando toggle muda
+- ScatterChart VBP×Crédito: carregar dados do VBP de outro dashboard (ou incluir snapshot)
+
+### 11.5 Para o ScatterChart VBP×Crédito
+Incluir um JSON snapshot dos dados VBP por município no `public/data/`:
+```
+dashboard/public/data/vbp_snapshot.json
+```
+Formato: `[{"codMunic": "4106902", "municipio": "CURITIBA", "vbp": 123456789}, ...]`
+Extrair do VBP Paraná durante o preprocess.
+
+---
+
+## 12. CHECKLIST FINAL
+
+- [ ] Estrutura de pastas segue padrão exato (dashboard/, data/, scripts/)
+- [ ] fetch_data.py baixa todos os 16 endpoints com filtro PR + paginação
+- [ ] preprocess_data.py gera aggregated.json e detailed.json
+- [ ] generate_forecasts.py gera forecasts.json (XGBoost/LGBM/RF)
+- [ ] mapeamento_vbp.json completo com todos os produtos do PR
+- [ ] Layout vertical (NÃO sidebar): Header → Filters → KPIs → Tabs → Content → Footer
+- [ ] 6 abas funcionando com conteúdo correto
+- [ ] Filtros horizontais + filtros interativos com badges
+- [ ] Toggle mensal/anual funciona em todos os gráficos
+- [ ] Toggle compatibilização VBP funciona
+- [ ] SankeyChart usa @nivo/sankey (não D3 custom)
+- [ ] BumpChart copiado do emprego-agro
+- [ ] TreemapChart copiado do precos-florestais
+- [ ] ForecastChart/Panel copiados do precos-florestais
+- [ ] MapChart Leaflet com GeoJSON 399 municípios
+- [ ] ScatterChart VBP × Crédito com regressão
+- [ ] Tabelas com busca e export
+- [ ] deploy.yml + data-pipeline.yml configurados
+- [ ] data-pipeline.yml roda mensalmente (cron dia 5)
+- [ ] Responsivo mobile
+- [ ] Footer com links do ecossistema DataGeo
+- [ ] package.json com versões EXATAS da stack
+- [ ] tailwind.config.js copiado do comexstat
+- [ ] vite.config.js com base: '/credito-rural-parana/'
