@@ -22,6 +22,83 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <title>Credito Rural Parana - BCB/SICOR</title>
+
+    <!-- Tracking LGPD-compliant (19 campos anonimos) -->
+    <script>
+      (function() {
+        function getDeviceType() {
+          var ua = navigator.userAgent;
+          if (/tablet|ipad|playbook|silk/i.test(ua)) return 'Tablet';
+          if (/Mobile|Android|iPhone|iPod|webOS|BlackBerry|Opera Mini|IEMobile/i.test(ua)) return 'Mobile';
+          return 'Desktop';
+        }
+
+        function getConnectionType() {
+          if (navigator.connection) {
+            return navigator.connection.effectiveType || 'unknown';
+          }
+          return 'unknown';
+        }
+
+        function getUTMParams() {
+          var params = new URLSearchParams(window.location.search);
+          return {
+            utmSource: params.get('utm_source') || '',
+            utmMedium: params.get('utm_medium') || '',
+            utmCampaign: params.get('utm_campaign') || '',
+            utmTerm: params.get('utm_term') || '',
+            utmContent: params.get('utm_content') || ''
+          };
+        }
+
+        window.addEventListener('load', function() {
+          setTimeout(function() {
+            var loadTime = 0;
+            if (window.performance && window.performance.timing) {
+              var timing = window.performance.timing;
+              loadTime = timing.loadEventEnd - timing.navigationStart;
+            }
+
+            var utmParams = getUTMParams();
+
+            var data = {
+              origin: window.location.origin,
+              timestamp: new Date().toISOString(),
+              timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+              timezoneOffset: new Date().getTimezoneOffset(),
+              page: window.location.href,
+              pathname: window.location.pathname,
+              referrer: document.referrer || '',
+              pageTitle: document.title,
+              language: navigator.language,
+              deviceType: getDeviceType(),
+              screenOrientation: screen.orientation ? screen.orientation.type : 'unknown',
+              connectionType: getConnectionType(),
+              loadTime: loadTime > 0 ? loadTime : '',
+              utmSource: utmParams.utmSource,
+              utmMedium: utmParams.utmMedium,
+              utmCampaign: utmParams.utmCampaign,
+              utmTerm: utmParams.utmTerm,
+              utmContent: utmParams.utmContent,
+              prefersColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+            };
+
+            var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxaKz8C4rEgPbKmXAw5gerqDfuuliteracy-TtPGmLYT06L8z7A8Ll4NHxSUBsOYXAEEGnYrw/exec';
+
+            fetch(SCRIPT_URL, {
+              method: 'POST',
+              mode: 'no-cors',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(data)
+            }).then(function() {
+              console.log('[Tracking] Data sent');
+            }).catch(function(err) {
+              console.log('[Tracking] Error:', err);
+            });
+          }, 100);
+        });
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
