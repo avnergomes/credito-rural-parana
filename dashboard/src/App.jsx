@@ -130,33 +130,36 @@ export default function App() {
     }
   }, [data?.metadata]);
 
-  // Build treemap data from filtered programa/finalidade
+  // Build treemap data from filtered byFinalidade (real data, not cross-join)
   const treemapData = useMemo(() => {
-    if (!filteredData?.byFinalidade || !filteredData?.byPrograma) return [];
+    if (!filteredData?.byFinalidade?.length) return [];
 
-    // Cross-join programa totals with finalidade proportions
-    const progTotals = filteredData.programaTotals || [];
-    const finTotals = filteredData.finalidadeTotals || [];
-
-    if (progTotals.length === 0 || finTotals.length === 0) return [];
-
-    const totalValor = finTotals.reduce((s, f) => s + f.valor, 0);
-
-    const result = [];
-    progTotals.forEach(prog => {
-      finTotals.forEach(fin => {
-        const proportion = fin.valor / totalValor;
-        result.push({
-          programa: prog.programa,
-          finalidade: fin.finalidade,
-          valor: prog.valor * proportion,
-          contratos: Math.round(prog.contratos * proportion),
-        });
-      });
+    // Aggregate directly by programa + finalidade (real data)
+    const grouped = {};
+    filteredData.byFinalidade.forEach(row => {
+      const key = `${row.programa}|${row.finalidade}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          programa: row.programa,
+          finalidade: row.finalidade,
+          valor: 0,
+          contratos: 0
+        };
+      }
+      grouped[key].valor += row.valor || 0;
+      grouped[key].contratos += row.contratos || 0;
     });
 
-    return result;
-  }, [filteredData]);
+    return Object.values(grouped)
+      .filter(d => d.valor > 0)
+      .map(d => ({
+        name: `${d.programa} - ${d.finalidade}`,
+        programa: d.programa,
+        finalidade: d.finalidade,
+        valor: d.valor,
+        contratos: d.contratos
+      }));
+  }, [filteredData?.byFinalidade]);
 
   if (loading) {
     return <Loading />;
