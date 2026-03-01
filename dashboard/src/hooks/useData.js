@@ -11,35 +11,45 @@ export function useData() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     async function loadData() {
       try {
         setLoading(true);
         setError(null);
 
-        const aggregatedRes = await fetch(`${BASE_URL}data/aggregated.json`);
+        const aggregatedRes = await fetch(`${BASE_URL}data/aggregated.json`, { signal });
         if (!aggregatedRes.ok) throw new Error('Falha ao carregar dados agregados');
         const aggregated = await aggregatedRes.json();
 
         let forecasts = null;
         try {
-          const forecastsRes = await fetch(`${BASE_URL}data/forecasts.json`);
+          const forecastsRes = await fetch(`${BASE_URL}data/forecasts.json`, { signal });
           if (forecastsRes.ok) {
             forecasts = await forecastsRes.json();
           }
         } catch (e) {
-          console.warn('Forecasts not available:', e);
+          if (e.name !== 'AbortError') console.warn('Forecasts not available:', e);
         }
 
-        setData({ ...aggregated, forecasts });
+        if (!signal.aborted) {
+          setData({ ...aggregated, forecasts });
+        }
       } catch (err) {
-        console.error('Error loading data:', err);
-        setError(err.message);
+        if (err.name !== 'AbortError') {
+          console.error('Error loading data:', err);
+          setError(err.message);
+        }
       } finally {
-        setLoading(false);
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
     }
 
     loadData();
+    return () => controller.abort();
   }, []);
 
   return { data, loading, error };
@@ -373,20 +383,30 @@ export function useGeoJSON() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const controller = new AbortController();
+    const { signal } = controller;
+
     async function loadGeoJSON() {
       try {
-        const res = await fetch(`${BASE_URL}data/municipios.geojson`);
+        const res = await fetch(`${BASE_URL}data/municipios.geojson`, { signal });
         if (!res.ok) throw new Error('Falha ao carregar GeoJSON');
         const data = await res.json();
-        setGeoJSON(data);
+        if (!signal.aborted) {
+          setGeoJSON(data);
+        }
       } catch (err) {
-        console.error('Error loading GeoJSON:', err);
-        setError(err.message);
+        if (err.name !== 'AbortError') {
+          console.error('Error loading GeoJSON:', err);
+          setError(err.message);
+        }
       } finally {
-        setLoading(false);
+        if (!signal.aborted) {
+          setLoading(false);
+        }
       }
     }
     loadGeoJSON();
+    return () => controller.abort();
   }, []);
 
   return { geoJSON, loading, error };
