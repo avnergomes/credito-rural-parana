@@ -1,4 +1,4 @@
-import { useRef, useEffect, useMemo } from 'react';
+import { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency } from '../utils/format';
 
@@ -12,6 +12,28 @@ const COLORS = [
 export default function BumpChart({ data, title, limit = 20, onEntityClick, selectedEntity }) {
   const svgRef = useRef(null);
   const tooltipRef = useRef(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 400 });
+
+  // ResizeObserver for responsive behavior
+  useEffect(() => {
+    const container = svgRef.current?.parentElement;
+    if (!container) return;
+
+    const observer = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width } = entry.contentRect;
+        if (width > 0) {
+          setDimensions(prev => ({
+            ...prev,
+            width: Math.round(width),
+          }));
+        }
+      }
+    });
+
+    observer.observe(container);
+    return () => observer.disconnect();
+  }, []);
 
   const { chartData, years, entities } = useMemo(() => {
     if (!data || !Array.isArray(data) || data.length === 0) {
@@ -67,7 +89,7 @@ export default function BumpChart({ data, title, limit = 20, onEntityClick, sele
     svg.selectAll('*').remove();
 
     const margin = { top: 30, right: 150, bottom: 30, left: 50 };
-    const width = svgRef.current.clientWidth || 800;
+    const width = dimensions.width;
     const height = Math.max(400, entities.length * 25);
 
     svg.attr('viewBox', `0 0 ${width} ${height}`);
@@ -180,7 +202,7 @@ export default function BumpChart({ data, title, limit = 20, onEntityClick, sele
       .attr('fill', d => colorScale(d.name))
       .text(d => d.name.length > 18 ? d.name.slice(0, 15) + '...' : d.name);
 
-  }, [chartData, years, entities, onEntityClick, selectedEntity]);
+  }, [chartData, years, entities, onEntityClick, selectedEntity, dimensions]);
 
   if (!chartData.length) {
     return (
