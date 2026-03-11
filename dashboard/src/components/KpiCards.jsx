@@ -7,8 +7,13 @@ export default function KpiCards({ totals }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
         {[...Array(5)].map((_, i) => (
           <div key={i} className="bg-white rounded-xl shadow-card p-4">
-            <div className="animate-shimmer h-4 w-20 rounded mb-2" />
-            <div className="animate-shimmer h-8 w-32 rounded" />
+            <div className="flex items-center gap-3">
+              <div className="skeleton w-9 h-9 rounded-lg shrink-0" />
+              <div className="min-w-0 flex-1">
+                <div className="skeleton h-3 w-16 mb-2" />
+                <div className="skeleton h-6 w-24" />
+              </div>
+            </div>
           </div>
         ))}
       </div>

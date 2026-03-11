@@ -85,6 +85,82 @@ body {
   animation: shimmer 1.5s infinite;
 }
 
+/* Filter panel animated collapse */
+.filter-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.3s ease, opacity 0.25s ease;
+  opacity: 1;
+}
+
+.filter-panel.collapsed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+}
+
+.filter-panel > div {
+  overflow: hidden;
+}
+
+/* Chart container title & description */
+.chart-container-title {
+  @apply text-lg font-semibold text-dark-800 mb-1;
+}
+
+.chart-container-desc {
+  @apply text-xs text-dark-400 mb-4;
+}
+
+/* Active filter badge */
+.active-filter-badge {
+  @apply inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+         bg-primary-50 text-primary-700 rounded-full border border-primary-200
+         hover:bg-primary-100 hover:border-primary-300
+         transition-all duration-200 ease-in-out;
+}
+
+.active-filter-badge:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(37, 99, 235, 0.1);
+}
+
+/* Skeleton pulse variant */
+.skeleton {
+  @apply rounded;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* Scrollbar-hide utility for tabs */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* Tab scroll indicators */
+.tab-scroll-btn {
+  @apply absolute top-0 bottom-px z-10 flex items-center px-1
+         text-dark-400 hover:text-dark-600 transition-colors;
+  pointer-events: auto;
+}
+
+.tab-scroll-btn.left {
+  left: 0;
+  background: linear-gradient(to right, white 60%, transparent);
+  padding-right: 12px;
+}
+
+.tab-scroll-btn.right {
+  right: 0;
+  background: linear-gradient(to left, white 60%, transparent);
+  padding-left: 12px;
+}
+
 /* Focus styles */
 button:focus-visible,
 a:focus-visible,

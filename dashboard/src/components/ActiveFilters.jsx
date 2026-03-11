@@ -26,22 +26,21 @@ export default function ActiveFilters({ filters, onRemove, onClear }) {
         <button
           key={key}
           onClick={() => onRemove(key)}
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium
-                     bg-primary-100 text-primary-700 rounded-full
-                     hover:bg-primary-200 transition-colors group"
+          className="active-filter-badge group"
         >
-          <span className="text-primary-500">{FILTER_LABELS[key] || key}:</span>
+          <span className="text-primary-400">{FILTER_LABELS[key] || key}:</span>
           <span>{String(value)}</span>
-          <X className="w-3 h-3 opacity-50 group-hover:opacity-100" />
+          <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
         </button>
       ))}
 
       {activeFilters.length > 1 && (
         <button
           onClick={onClear}
-          className="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium
-                     bg-red-100 text-red-700 rounded-full
-                     hover:bg-red-200 transition-colors"
+          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
+                     bg-red-50 text-red-700 rounded-full border border-red-200
+                     hover:bg-red-100 hover:border-red-300
+                     transition-all duration-200 ease-in-out"
         >
           <Trash2 className="w-3 h-3" />
           Limpar todos
