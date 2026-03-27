@@ -38,3 +38,9 @@ data/raw/*.json
 # Temporary files
 *.tmp
 *.temp
+
+# Claude Code
+.claude/
+CLAUDE.md
+.claudeignore
+
