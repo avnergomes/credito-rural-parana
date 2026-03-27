@@ -42,6 +42,13 @@ def fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict:
                 continue
 
             response.raise_for_status()
+            content_type = response.headers.get('Content-Type', '')
+            if 'html' in content_type.lower():
+                print(f"    WARNING: Received HTML instead of JSON (Content-Type: {content_type})")
+                if attempt < max_retries - 1:
+                    time.sleep(RETRY_DELAY * (attempt + 1))
+                    continue
+                raise ValueError(f"API returned HTML instead of JSON: {content_type}")
             return response.json()
 
         except requests.exceptions.RequestException as e:
