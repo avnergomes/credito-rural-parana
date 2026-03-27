@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
+import { feature } from 'topojson-client';
 
 const BASE_URL = import.meta.env.BASE_URL || '/credito-rural-parana/';
+const TOPO_URL = 'https://cdn.jsdelivr.net/gh/datageoparana/datageoparana.github.io@main/assets/parana-municipalities.topojson';
 
 /**
  * Hook to load all dashboard data
@@ -388,9 +390,10 @@ export function useGeoJSON() {
 
     async function loadGeoJSON() {
       try {
-        const res = await fetch(`${BASE_URL}data/municipios.geojson`, { signal });
+        const res = await fetch(TOPO_URL, { signal });
         if (!res.ok) throw new Error('Falha ao carregar GeoJSON');
-        const data = await res.json();
+        const topo = await res.json();
+        const data = feature(topo, topo.objects.municipalities);
         if (!signal.aborted) {
           setGeoJSON(data);
         }

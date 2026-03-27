@@ -55,3 +55,4 @@ dashboard/dist/
 data/raw/*.json
 *.tmp
 *.temp
+dashboard/public/data/municipios.geojson
