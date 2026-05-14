@@ -1,18 +1,19 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useMemo } from 'react';
 import { ResponsiveSankey } from '@nivo/sankey';
 import { formatCurrency } from '../utils/format';
 
 const COLORS = {
   // Programas
-  'PRONAF': '#8b5cf6',
+  'PRONAF': '#CC79A7',
   'PRONAMP': '#06b6d4',
   'DEMAIS': '#f97316',
   // Finalidades
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#16a34a',
-  'COMERCIALIZACAO': '#f59e0b',
+  'INVESTIMENTO': '#005c8e',
+  'COMERCIALIZACAO': '#c89b3c',
   // Default
-  'default': '#94a3b8',
+  'default': '#918058',
 };
 
 const PROGRAMAS = ['PRONAF', 'PRONAMP', 'DEMAIS'];

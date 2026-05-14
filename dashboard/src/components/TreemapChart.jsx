@@ -1,14 +1,15 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency } from '../utils/format';
 
 const COLORS = {
-  'PRONAF': '#8b5cf6',
+  'PRONAF': '#CC79A7',
   'PRONAMP': '#06b6d4',
   'DEMAIS': '#f97316',
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#16a34a',
-  'COMERCIALIZACAO': '#f59e0b',
+  'INVESTIMENTO': '#005c8e',
+  'COMERCIALIZACAO': '#c89b3c',
 };
 
 export default function TreemapChart({ data, title, onProgramaClick, onFinalidadeClick, selectedPrograma, selectedFinalidade }) {
@@ -83,7 +84,7 @@ export default function TreemapChart({ data, title, onProgramaClick, onFinalidad
     // Add rectangles
     leaf.append('rect')
       .attr('fill', d => {
-        const color = COLORS[d.data.programa] || COLORS[d.data.name] || '#94a3b8';
+        const color = COLORS[d.data.programa] || COLORS[d.data.name] || '#918058';
         return d3.color(color).brighter(d.depth * 0.3);
       })
       .attr('width', d => d.x1 - d.x0)

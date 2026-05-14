@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency, formatNumber } from '../utils/format';
@@ -141,7 +142,7 @@ export default function LollipopChart({
       .attr('y', d => yScale(d.label) + yScale.bandwidth() / 2)
       .attr('dy', '0.35em')
       .attr('font-size', '10px')
-      .attr('fill', '#64748b')
+      .attr('fill', '#6e6453')
       .text(d => formatValue(d.value));
 
   }, [chartData, color, formatValue, onClick, selectedValue]);

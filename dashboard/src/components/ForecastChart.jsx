@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useMemo } from 'react';
 import {
   ComposedChart,
@@ -138,13 +139,13 @@ export default function ForecastChart({
             <XAxis
               dataKey="periodo"
               tickFormatter={formatLabel}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               tickLine={false}
               axisLine={{ stroke: '#e2e8f0' }}
             />
             <YAxis
               tickFormatter={(v) => formatCurrency(v, true)}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               tickLine={false}
               axisLine={false}
               width={80}
@@ -160,7 +161,7 @@ export default function ForecastChart({
               type="monotone"
               dataKey="upper95"
               stroke="none"
-              fill="#22c55e"
+              fill="#0072B2"
               fillOpacity={0.1}
               name="IC 95%"
             />
@@ -177,7 +178,7 @@ export default function ForecastChart({
               type="monotone"
               dataKey="upper80"
               stroke="none"
-              fill="#22c55e"
+              fill="#0072B2"
               fillOpacity={0.2}
               name="IC 80%"
             />
@@ -204,10 +205,10 @@ export default function ForecastChart({
             <Line
               type="monotone"
               dataKey="previsao"
-              stroke="#22c55e"
+              stroke="#0072B2"
               strokeWidth={2}
               strokeDasharray="5 5"
-              dot={{ r: 3, fill: '#22c55e' }}
+              dot={{ r: 3, fill: '#0072B2' }}
               activeDot={{ r: 5 }}
               name="Previsao"
             />
@@ -216,12 +217,12 @@ export default function ForecastChart({
             {transitionIndex > 0 && chartData[transitionIndex] && (
               <ReferenceLine
                 x={chartData[transitionIndex].periodo}
-                stroke="#94a3b8"
+                stroke="#918058"
                 strokeDasharray="3 3"
                 label={{
                   value: 'Inicio Previsao',
                   position: 'top',
-                  fill: '#64748b',
+                  fill: '#6e6453',
                   fontSize: 10,
                 }}
               />

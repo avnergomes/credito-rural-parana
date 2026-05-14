@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -39,13 +40,13 @@ const TABS = [
 
 const FINALIDADE_COLORS = {
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#16a34a',
-  'COMERCIALIZACAO': '#f59e0b',
-  'INDUSTRIALIZACAO': '#8b5cf6',
+  'INVESTIMENTO': '#005c8e',
+  'COMERCIALIZACAO': '#c89b3c',
+  'INDUSTRIALIZACAO': '#CC79A7',
 };
 
 const PROGRAMA_COLORS = {
-  'PRONAF': '#8b5cf6',
+  'PRONAF': '#CC79A7',
   'PRONAMP': '#06b6d4',
   'DEMAIS': '#f97316',
 };
@@ -273,7 +274,7 @@ export default function App() {
                       <XAxis
                         type="number"
                         tickFormatter={(v) => formatCurrency(v, true)}
-                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        tick={{ fontSize: 11, fill: '#6e6453' }}
                       />
                       <YAxis
                         dataKey="programa"
@@ -298,7 +299,7 @@ export default function App() {
                         {(filteredData?.programaTotals || []).map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={PROGRAMA_COLORS[entry.programa] || '#94a3b8'}
+                            fill={PROGRAMA_COLORS[entry.programa] || '#918058'}
                           />
                         ))}
                       </Bar>
@@ -321,7 +322,7 @@ export default function App() {
                       <XAxis
                         type="number"
                         tickFormatter={(v) => formatCurrency(v, true)}
-                        tick={{ fontSize: 11, fill: '#64748b' }}
+                        tick={{ fontSize: 11, fill: '#6e6453' }}
                       />
                       <YAxis
                         dataKey="finalidade"
@@ -346,7 +347,7 @@ export default function App() {
                         {(filteredData?.finalidadeTotals || []).map((entry, index) => (
                           <Cell
                             key={`cell-${index}`}
-                            fill={FINALIDADE_COLORS[entry.finalidade] || '#94a3b8'}
+                            fill={FINALIDADE_COLORS[entry.finalidade] || '#918058'}
                           />
                         ))}
                       </Bar>
@@ -362,7 +363,7 @@ export default function App() {
                   valueKey="contratos"
                   labelKey="programa"
                   limit={10}
-                  color="#8b5cf6"
+                  color="#CC79A7"
                   onClick={(programa) => handleFilterClick('programa', programa)}
                   selectedValue={interactiveFilters.programa}
                 />
@@ -439,7 +440,7 @@ export default function App() {
                 valueKey="valor"
                 labelKey="produto"
                 limit={20}
-                color="#16a34a"
+                color="#005c8e"
                 onClick={(produto) => handleFilterClick('produto', produto)}
                 selectedValue={interactiveFilters.produto}
               />

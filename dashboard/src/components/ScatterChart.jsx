@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useMemo, useState } from 'react';
 import {
   ScatterChart as RechartsScatterChart,
@@ -15,9 +16,9 @@ import { formatCurrency, formatNumber } from '../utils/format';
 
 const FINALIDADE_COLORS = {
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#16a34a',
-  'COMERCIALIZACAO': '#f59e0b',
-  'Outros': '#94a3b8',
+  'INVESTIMENTO': '#005c8e',
+  'COMERCIALIZACAO': '#c89b3c',
+  'Outros': '#918058',
 };
 
 export default function ScatterChart({
@@ -193,7 +194,7 @@ export default function ScatterChart({
               dataKey="vbp"
               name="VBP"
               tickFormatter={(v) => formatCurrency(v, true)}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               label={{
                 value: 'VBP (R$)',
                 position: 'insideBottom',
@@ -207,7 +208,7 @@ export default function ScatterChart({
               dataKey="credito"
               name="Credito"
               tickFormatter={(v) => formatCurrency(v, true)}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               label={{
                 value: 'Credito Rural (R$)',
                 angle: -90,
@@ -240,7 +241,7 @@ export default function ScatterChart({
             {showTrendline && regression && (
               <ReferenceLine
                 segment={regression.points.map(p => ({ x: p.x, y: p.y }))}
-                stroke="#ef4444"
+                stroke="#D55E00"
                 strokeWidth={2}
                 strokeDasharray="5 5"
               />

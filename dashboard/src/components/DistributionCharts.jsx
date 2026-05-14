@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import {
   BarChart,
   Bar,
@@ -12,7 +13,7 @@ import {
 import { formatCurrency, formatPercent } from '../utils/format';
 
 const GENDER_COLORS = { 'Masculino': '#3b82f6', 'Feminino': '#ec4899' };
-const PERSON_COLORS = { 'Pessoa Fisica': '#22c55e', 'Pessoa Juridica': '#f59e0b' };
+const PERSON_COLORS = { 'Pessoa Fisica': '#0072B2', 'Pessoa Juridica': '#c89b3c' };
 
 export default function DistributionCharts({ genero, tipoPessoa }) {
   const generoData = genero ? [
@@ -51,7 +52,7 @@ export default function DistributionCharts({ genero, tipoPessoa }) {
             <XAxis
               type="number"
               tickFormatter={(v) => formatCurrency(v, true)}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               axisLine={{ stroke: '#e2e8f0' }}
             />
             <YAxis
@@ -81,14 +82,14 @@ export default function DistributionCharts({ genero, tipoPessoa }) {
               {dataWithPercent.map((entry, index) => (
                 <Cell
                   key={`cell-${index}`}
-                  fill={colors[entry.name] || '#94a3b8'}
+                  fill={colors[entry.name] || '#918058'}
                 />
               ))}
               <LabelList
                 dataKey="percent"
                 position="right"
                 formatter={(v) => `${v}%`}
-                style={{ fontSize: 12, fill: '#64748b' }}
+                style={{ fontSize: 12, fill: '#6e6453' }}
               />
             </Bar>
           </BarChart>

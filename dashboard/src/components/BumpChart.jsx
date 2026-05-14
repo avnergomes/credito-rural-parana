@@ -2,12 +2,8 @@ import { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency } from '../utils/format';
 
-const COLORS = [
-  '#2563eb', '#16a34a', '#f59e0b', '#ef4444', '#8b5cf6',
-  '#06b6d4', '#ec4899', '#f97316', '#14b8a6', '#6366f1',
-  '#84cc16', '#a855f7', '#0ea5e9', '#f43f5e', '#22c55e',
-  '#eab308', '#3b82f6', '#10b981', '#f472b6', '#facc15',
-];
+// ATLAS-PALETTE-V1 — Okabe-Ito daltonic-safe categorical
+const COLORS = ['#0072B2','#D55E00','#009E73','#E69F00','#CC79A7','#56B4E9','#F0E442','#2a2419'];
 
 export default function BumpChart({ data, title, limit = 20, onEntityClick, selectedEntity }) {
   const svgRef = useRef(null);

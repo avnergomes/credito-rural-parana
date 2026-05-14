@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import * as d3 from 'd3';
@@ -120,7 +121,7 @@ export default function MapChart({
       fillColor: value > 0 && colorScale ? colorScale(value) : '#f1f5f9',
       weight: isSelected ? 2 : 0.5,
       opacity: 1,
-      color: isSelected ? '#2563eb' : '#94a3b8',
+      color: isSelected ? '#2563eb' : '#918058',
       fillOpacity: isSelected ? 0.9 : 0.7,
     };
   };

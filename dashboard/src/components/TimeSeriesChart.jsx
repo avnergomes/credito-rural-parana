@@ -1,3 +1,4 @@
+// ATLAS-A11Y-HEX-SWEPT
 import { useMemo } from 'react';
 import {
   AreaChart,
@@ -14,9 +15,9 @@ import { formatCurrency, formatNumber } from '../utils/format';
 
 const COLORS = {
   custeio: '#2563eb',
-  investimento: '#16a34a',
-  comercializacao: '#f59e0b',
-  total: '#6366f1',
+  investimento: '#005c8e',
+  comercializacao: '#c89b3c',
+  total: '#7a4e88',
 };
 
 export default function TimeSeriesChart({
@@ -133,13 +134,13 @@ export default function TimeSeriesChart({
             <XAxis
               dataKey="periodo"
               tickFormatter={formatLabel}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               tickLine={false}
               axisLine={{ stroke: '#e2e8f0' }}
             />
             <YAxis
               tickFormatter={(v) => formatCurrency(v, true)}
-              tick={{ fontSize: 11, fill: '#64748b' }}
+              tick={{ fontSize: 11, fill: '#6e6453' }}
               tickLine={false}
               axisLine={false}
               width={80}
@@ -190,7 +191,7 @@ export default function TimeSeriesChart({
               <Brush
                 dataKey="periodo"
                 height={30}
-                stroke="#94a3b8"
+                stroke="#918058"
                 tickFormatter={formatLabel}
               />
             )}
