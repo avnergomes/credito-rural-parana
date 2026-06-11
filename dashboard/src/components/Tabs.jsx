@@ -48,6 +48,22 @@ export default function Tabs({ tabs, activeTab, onChange }) {
         ref={navRef}
         role="tablist"
         className="flex gap-1 overflow-x-auto pb-px -mb-px scrollbar-hide"
+        onKeyDown={(e) => {
+          // Padrão WAI-ARIA Tabs: setas movem e ativam; Home/End vão aos extremos.
+          // Sem isto, o roving tabindex (-1) bloqueava as abas para teclado.
+          const idx = tabs.findIndex((t) => t.id === activeTab);
+          let next = null;
+          if (e.key === 'ArrowRight') next = (idx + 1) % tabs.length;
+          else if (e.key === 'ArrowLeft') next = (idx - 1 + tabs.length) % tabs.length;
+          else if (e.key === 'Home') next = 0;
+          else if (e.key === 'End') next = tabs.length - 1;
+          if (next !== null) {
+            e.preventDefault();
+            onChange(tabs[next].id);
+            const buttons = navRef.current?.querySelectorAll('[role="tab"]');
+            buttons?.[next]?.focus();
+          }
+        }}
       >
         {tabs.map((tab) => {
           const Icon = LucideIcons[tab.icon];

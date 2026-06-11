@@ -6,6 +6,7 @@ All aggregations include ano/mes for filtering support.
 """
 
 import json
+import sys
 from pathlib import Path
 from datetime import datetime
 from collections import defaultdict
@@ -515,8 +516,10 @@ def main():
     genero_data = process_genero()
 
     if df_regiao.empty:
+        # Falhar o pipeline: seguir adiante gravaria um dashboard vazio
+        # e o workflow terminaria "verde" sem dados.
         print("ERROR: No RegiaoUF data found.")
-        return
+        sys.exit(1)
 
     print(f"  IBGE names: {len(ibge_names)} municipalities")
 
@@ -569,7 +572,9 @@ def main():
             "totalValor": total_valor,
             "totalArea": genero_data["totalArea"],
             "ultimaAtualizacao": datetime.now().strftime("%Y-%m-%d"),
-            "periodoMaisRecente": f"{ano_max}-{int(df_regiao['mes'].max()):02d}",
+            # Mes mais recente DENTRO do ultimo ano (mes.max() global indicava
+            # ex.: 2026-12 quando o dado real ia so ate 2026-01)
+            "periodoMaisRecente": f"{ano_max}-{int(df_regiao.loc[df_regiao['ano'] == ano_max, 'mes'].max()):02d}",
         },
         "filters": {
             "finalidades": ["CUSTEIO", "INVESTIMENTO", "COMERCIALIZACAO"],

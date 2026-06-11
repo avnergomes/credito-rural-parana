@@ -15,28 +15,39 @@ const COLOR_SCALE = [
 function MapLegend({ scale, metric }) {
   if (!scale) return null;
 
-  const domain = scale.domain();
   const range = scale.range();
+
+  // Formatador por métrica (antes tudo era exibido como R$)
+  const formatValue = (v) => {
+    if (v === null || v === undefined || Number.isNaN(v)) return '-';
+    if (metric === 'contratos') return formatNumber(v, true);
+    if (metric === 'area') return `${formatNumber(v, true)} ha`;
+    return formatCurrency(v, true);
+  };
 
   return (
     <div className="absolute bottom-4 left-4 bg-white rounded-lg shadow-lg p-3 z-[1000]">
       <div className="text-xs font-medium text-dark-700 mb-2">
         {metric === 'valor' ? 'Valor (R$)' :
          metric === 'contratos' ? 'Contratos' :
-         metric === 'area' ? 'Area (ha)' : 'Valor'}
+         metric === 'area' ? 'Área (ha)' : 'Valor'}
       </div>
       <div className="flex flex-col gap-1">
-        {range.map((color, i) => (
-          <div key={i} className="flex items-center gap-2">
-            <div
-              className="w-4 h-3 rounded"
-              style={{ backgroundColor: color }}
-            />
-            <span className="text-xs text-dark-600">
-              {formatCurrency(domain[i], true)}
-            </span>
-          </div>
-        ))}
+        {range.map((color, i) => {
+          // invertExtent devolve o intervalo real de cada cor do quantize
+          const [v0, v1] = scale.invertExtent(color);
+          return (
+            <div key={i} className="flex items-center gap-2">
+              <div
+                className="w-4 h-3 rounded"
+                style={{ backgroundColor: color }}
+              />
+              <span className="text-xs text-dark-600">
+                {formatValue(v0)} – {formatValue(v1)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

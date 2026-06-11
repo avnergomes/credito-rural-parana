@@ -56,3 +56,6 @@ data/raw/*.json
 *.tmp
 *.temp
 dashboard/public/data/municipios.geojson
+
+# Artefatos locais do understand-anything
+.understand-anything/

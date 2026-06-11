@@ -15,7 +15,7 @@ import { formatCurrency, formatNumber } from '../utils/format';
 
 const COLORS = {
   custeio: '#2563eb',
-  investimento: '#005c8e',
+  investimento: '#E69F00',
   comercializacao: '#c89b3c',
   total: '#7a4e88',
 };

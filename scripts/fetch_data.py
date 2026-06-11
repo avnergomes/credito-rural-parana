@@ -5,6 +5,7 @@ Downloads rural credit data - simplified version with retry logic.
 """
 
 import json
+import sys
 import time
 import requests
 from pathlib import Path
@@ -60,7 +61,9 @@ def fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict:
             else:
                 raise
 
-    return {"value": []}
+    # Antes retornava {"value": []} — o pipeline seguia "verde" com dados
+    # vazios e o dashboard congelava silenciosamente (500s persistentes).
+    raise RuntimeError(f"Falha apos {max_retries} tentativas (HTTP 500 persistente): {url}")
 
 
 def fetch_endpoint(endpoint: str, filter_expr: str = None) -> list:
@@ -94,8 +97,9 @@ def fetch_endpoint(endpoint: str, filter_expr: str = None) -> list:
             time.sleep(REQUEST_DELAY)
 
         except Exception as e:
+            # Propagar: salvar página parcial como se fosse o total corrompe o dataset
             print(f"  Error: {e}")
-            break
+            raise
 
     return all_data
 
@@ -126,13 +130,16 @@ def main():
         ("RegiaoUFGenero", "nomeUF eq 'PR'"),
         ("CusteioRegiaoUFProduto", "nomeUF eq 'PR'"),
         ("InvestRegiaoUFProduto", "nomeUF eq 'PR'"),
+        ("ComercRegiaoUFProduto", "nomeUF eq 'PR'"),
         ("ProgramaSubprogramaRegiaoUF", "nomeUF eq 'PR'"),
+        ("MunicipioUF", "nomeUF eq 'PR'"),
 
         # Reference tables (small, no filter)
         ("ProgramaSubprograma", None),
         ("Faixa", None),
     ]
 
+    failed = []
     for endpoint, filter_expr in endpoints:
         print(f"\n{'='*40}")
         print(f"Fetching: {endpoint}")
@@ -147,13 +154,17 @@ def main():
                 save_data(endpoint, data)
             else:
                 print("  No data returned")
+                failed.append(endpoint)
 
         except Exception as e:
             print(f"  FAILED: {e}")
+            failed.append(endpoint)
 
         # Pause between endpoints
         print("  Waiting 3s before next endpoint...")
         time.sleep(3)
+
+    fetch_ibge_municipios()
 
     print("\n" + "=" * 60)
     print(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -164,6 +175,32 @@ def main():
     for f in sorted(DATA_DIR.glob("*.json")):
         size_kb = f.stat().st_size / 1024
         print(f"  {f.name}: {size_kb:.1f} KB")
+
+    if failed:
+        # Falhar o job para o GitHub Actions notificar, em vez de seguir
+        # "verde" com dados vazios/parciais.
+        print(f"\nERRO: endpoints sem dados: {', '.join(failed)}")
+        sys.exit(1)
+
+
+def fetch_ibge_municipios():
+    """Baixa o mapeamento codigo->nome dos municipios do PR (IBGE)."""
+    print(f"\n{'='*40}")
+    print("Fetching: ibge_municipios (IBGE localidades)")
+    print("=" * 40)
+    try:
+        resp = requests.get(
+            "https://servicodados.ibge.gov.br/api/v1/localidades/estados/PR/municipios",
+            timeout=60,
+        )
+        resp.raise_for_status()
+        municipios = {str(m["id"]): m["nome"] for m in resp.json()}
+        with open(DATA_DIR / "ibge_municipios.json", "w", encoding="utf-8") as f:
+            json.dump(municipios, f, ensure_ascii=False)
+        print(f"  Saved {len(municipios)} municipios")
+    except Exception as e:
+        # Nao e fatal: o preprocess tem fallback para o nome vindo do BCB
+        print(f"  AVISO: falha ao baixar municipios do IBGE: {e}")
 
 
 if __name__ == "__main__":

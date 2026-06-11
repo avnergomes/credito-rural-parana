@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Filter, ChevronDown, ToggleLeft, ToggleRight } from 'lucide-react';
+import { Filter, ChevronDown } from 'lucide-react';
 
 export default function Filters({ filters, onChange, metadata, finalidades, programas }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -22,9 +22,9 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
     let count = 0;
     if (filters.finalidade) count++;
     if (filters.programa) count++;
-    if (filters.compatibilizarVBP) count++;
+    
     return count;
-  }, [filters.finalidade, filters.programa, filters.compatibilizarVBP]);
+  }, [filters.finalidade, filters.programa]);
 
   return (
     <div className="bg-white rounded-xl shadow-card p-4 mb-6">
@@ -150,24 +150,9 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
               </div>
             </div>
 
-            {/* Toggle Compatibilizar VBP */}
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => handleChange('compatibilizarVBP', !filters.compatibilizarVBP)}
-                className={`flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition-colors ${
-                  filters.compatibilizarVBP
-                    ? 'bg-secondary-100 text-secondary-700'
-                    : 'bg-dark-100 text-dark-600'
-                }`}
-              >
-                {filters.compatibilizarVBP ? (
-                  <ToggleRight className="w-5 h-5" />
-                ) : (
-                  <ToggleLeft className="w-5 h-5" />
-                )}
-                VBP
-              </button>
-            </div>
+            {/* Toggle "Compatibilizar VBP" removido: a feature nunca foi
+                implementada (ScatterChart/mapeamento_vbp.json sem consumidor),
+                o botão não tinha nenhum efeito. */}
           </div>
         </div>
       </div>

@@ -34,10 +34,10 @@ export default function Header({ metadata }) {
             </div>
             <div>
               <h1 className="text-2xl md:text-3xl lg:text-4xl font-display font-bold text-white">
-                Credito Rural Parana
+                Crédito Rural Paraná
               </h1>
               <p className="text-primary-100 text-sm md:text-base mt-1">
-                Financiamento Agropecuario — BCB/SICOR
+                Financiamento Agropecuário — BCB/SICOR
               </p>
             </div>
           </div>

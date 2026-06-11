@@ -8,7 +8,7 @@ const COLORS = {
   'PRONAMP': '#06b6d4',
   'DEMAIS': '#f97316',
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#005c8e',
+  'INVESTIMENTO': '#E69F00',
   'COMERCIALIZACAO': '#c89b3c',
 };
 

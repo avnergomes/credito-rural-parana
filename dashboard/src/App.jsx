@@ -30,17 +30,17 @@ import {
 import { formatCurrency } from './utils/format';
 
 const TABS = [
-  { id: 'visao-geral', label: 'Visao Geral', icon: 'LayoutDashboard' },
+  { id: 'visao-geral', label: 'Visão Geral', icon: 'LayoutDashboard' },
   { id: 'programas', label: 'Programas', icon: 'PieChart' },
-  { id: 'municipios', label: 'Municipios', icon: 'MapPin' },
+  { id: 'municipios', label: 'Municípios', icon: 'MapPin' },
   { id: 'produtos', label: 'Produtos', icon: 'Package' },
   { id: 'mapa', label: 'Mapa', icon: 'Globe' },
-  { id: 'previsoes', label: 'Previsoes', icon: 'TrendingUp' },
+  { id: 'previsoes', label: 'Previsões', icon: 'TrendingUp' },
 ];
 
 const FINALIDADE_COLORS = {
   'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#005c8e',
+  'INVESTIMENTO': '#E69F00',
   'COMERCIALIZACAO': '#c89b3c',
   'INDUSTRIALIZACAO': '#CC79A7',
 };
@@ -440,7 +440,7 @@ export default function App() {
                 valueKey="valor"
                 labelKey="produto"
                 limit={20}
-                color="#005c8e"
+                color="#E69F00"
                 onClick={(produto) => handleFilterClick('produto', produto)}
                 selectedValue={interactiveFilters.produto}
               />

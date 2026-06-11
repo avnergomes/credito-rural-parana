@@ -205,7 +205,7 @@ export default function ForecastChart({
             <Line
               type="monotone"
               dataKey="previsao"
-              stroke="#0072B2"
+              stroke="#D55E00"
               strokeWidth={2}
               strokeDasharray="5 5"
               dot={{ r: 3, fill: '#0072B2' }}
