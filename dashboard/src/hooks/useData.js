@@ -1,8 +1,36 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { feature } from 'topojson-client';
 
 const BASE_URL = import.meta.env.BASE_URL || '/credito-rural-parana/';
 const TOPO_URL = 'https://cdn.jsdelivr.net/gh/datageoparana/datageoparana.github.io@main/assets/parana-municipalities.topojson';
+
+/**
+ * Reads a fetch Response streaming the body, reporting progress in bytes.
+ * Falls back to res.json() when ReadableStream is not supported.
+ */
+async function readJsonWithProgress(res, onProgress) {
+  if (!res.body || typeof res.body.getReader !== 'function') {
+    return res.json();
+  }
+  const reader = res.body.getReader();
+  const chunks = [];
+  let received = 0;
+  let lastReported = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    // Throttle updates to every ~512 KB to avoid excessive re-renders
+    if (onProgress && received - lastReported > 512 * 1024) {
+      lastReported = received;
+      onProgress(received);
+    }
+  }
+  if (onProgress) onProgress(received);
+  const text = await new Blob(chunks).text();
+  return JSON.parse(text);
+}
 
 /**
  * Hook to load all dashboard data
@@ -11,6 +39,10 @@ export function useData() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [attempt, setAttempt] = useState(0);
+
+  const retry = useCallback(() => setAttempt(a => a + 1), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -20,10 +52,13 @@ export function useData() {
       try {
         setLoading(true);
         setError(null);
+        setProgress(0);
 
         const aggregatedRes = await fetch(`${BASE_URL}data/aggregated.json`, { signal });
         if (!aggregatedRes.ok) throw new Error('Falha ao carregar dados agregados');
-        const aggregated = await aggregatedRes.json();
+        const aggregated = await readJsonWithProgress(aggregatedRes, (bytes) => {
+          if (!signal.aborted) setProgress(bytes);
+        });
 
         let forecasts = null;
         try {
@@ -52,9 +87,9 @@ export function useData() {
 
     loadData();
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
-  return { data, loading, error };
+  return { data, loading, error, progress, retry };
 }
 
 /**
@@ -383,6 +418,11 @@ export function useGeoJSON() {
   const [geoJSON, setGeoJSON] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [attempt, setAttempt] = useState(0);
+
+  // Refaz o fetch do TopoJSON sem recarregar a pagina (CDN pode falhar
+  // em redes que bloqueiam cdn.jsdelivr.net).
+  const retry = useCallback(() => setAttempt(a => a + 1), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -390,6 +430,8 @@ export function useGeoJSON() {
 
     async function loadGeoJSON() {
       try {
+        setLoading(true);
+        setError(null);
         const res = await fetch(TOPO_URL, { signal });
         if (!res.ok) throw new Error('Falha ao carregar GeoJSON');
         const topo = await res.json();
@@ -410,7 +452,7 @@ export function useGeoJSON() {
     }
     loadGeoJSON();
     return () => controller.abort();
-  }, []);
+  }, [attempt]);
 
-  return { geoJSON, loading, error };
+  return { geoJSON, loading, error, retry };
 }

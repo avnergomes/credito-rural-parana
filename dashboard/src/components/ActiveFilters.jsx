@@ -4,7 +4,7 @@ const FILTER_LABELS = {
   finalidade: 'Finalidade',
   programa: 'Programa',
   produto: 'Produto',
-  municipio: 'Municipio',
+  municipio: 'Município',
   ano: 'Ano',
 };
 

@@ -92,7 +92,7 @@ export default function ForecastChart({
         {data.historico !== undefined && (
           <div className="flex items-center gap-2 text-sm">
             <div className="w-3 h-3 rounded-full bg-primary-600" />
-            <span className="text-dark-600">Historico:</span>
+            <span className="text-dark-600">Histórico:</span>
             <span className="font-medium">{formatCurrency(data.historico, true)}</span>
           </div>
         )}
@@ -100,7 +100,7 @@ export default function ForecastChart({
           <>
             <div className="flex items-center gap-2 text-sm">
               <div className="w-3 h-3 rounded-full bg-secondary-600" />
-              <span className="text-dark-600">Previsao:</span>
+              <span className="text-dark-600">Previsão:</span>
               <span className="font-medium">{formatCurrency(data.previsao, true)}</span>
             </div>
             {data.lower95 !== undefined && data.upper95 !== undefined && (
@@ -119,7 +119,7 @@ export default function ForecastChart({
       <div className="chart-container">
         <h3>{title}</h3>
         <div className="h-80 flex items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
-          Dados de previsao nao disponiveis
+          Dados de previsão não disponíveis
         </div>
       </div>
     );
@@ -190,27 +190,27 @@ export default function ForecastChart({
               fillOpacity={1}
             />
 
-            {/* Historical line */}
+            {/* Historical line — azul Okabe-Ito */}
             <Line
               type="monotone"
               dataKey="historico"
-              stroke="#2563eb"
+              stroke="#0072B2"
               strokeWidth={2}
-              dot={{ r: 3, fill: '#2563eb' }}
+              dot={{ r: 3, fill: '#0072B2' }}
               activeDot={{ r: 5 }}
-              name="Historico"
+              name="Histórico"
             />
 
-            {/* Forecast line */}
+            {/* Forecast line — vermelhão Okabe-Ito, tracejada (redundância não-cromática) */}
             <Line
               type="monotone"
               dataKey="previsao"
               stroke="#D55E00"
               strokeWidth={2}
               strokeDasharray="5 5"
-              dot={{ r: 3, fill: '#0072B2' }}
+              dot={{ r: 3, fill: '#D55E00' }}
               activeDot={{ r: 5 }}
-              name="Previsao"
+              name="Previsão"
             />
 
             {/* Vertical line at transition point */}
@@ -220,7 +220,7 @@ export default function ForecastChart({
                 stroke="#918058"
                 strokeDasharray="3 3"
                 label={{
-                  value: 'Inicio Previsao',
+                  value: 'Início da Previsão',
                   position: 'top',
                   fill: '#6e6453',
                   fontSize: 10,

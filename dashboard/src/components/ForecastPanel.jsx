@@ -4,10 +4,10 @@ import ForecastChart from './ForecastChart';
 import { formatCurrency, formatPercent } from '../utils/format';
 
 const SERIES_OPTIONS = [
-  { value: 'total', label: 'Total Parana' },
+  { value: 'total', label: 'Total Paraná' },
   { value: 'custeio', label: 'Custeio' },
   { value: 'investimento', label: 'Investimento' },
-  { value: 'comercializacao', label: 'Comercializacao' },
+  { value: 'comercializacao', label: 'Comercialização' },
 ];
 
 const MODEL_OPTIONS = [
@@ -62,12 +62,12 @@ export default function ForecastPanel({ historicalData, forecastData }) {
       <div className="chart-container">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <h3 className="text-lg font-semibold text-dark-800">
-            Projecoes de Credito Rural
+            Projeções de Crédito Rural
           </h3>
 
           <div className="flex flex-wrap items-center gap-4">
             <div>
-              <label className="block text-xs text-dark-500 mb-1">Serie</label>
+              <label className="block text-xs text-dark-500 mb-1">Série</label>
               <select
                 value={serie}
                 onChange={(e) => setSerie(e.target.value)}
@@ -101,14 +101,14 @@ export default function ForecastPanel({ historicalData, forecastData }) {
       {metrics && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-card p-4">
-            <div className="text-xs text-dark-500 mb-1">Proximo Mes</div>
+            <div className="text-xs text-dark-500 mb-1">Próximo Mês</div>
             <div className="text-lg font-semibold text-primary-600">
               {formatCurrency(metrics.nextMonth, true)}
             </div>
           </div>
 
           <div className="bg-white rounded-xl shadow-card p-4">
-            <div className="text-xs text-dark-500 mb-1">Tendencia ({metrics.horizon} meses)</div>
+            <div className="text-xs text-dark-500 mb-1">Tendência ({metrics.horizon} meses)</div>
             <div className="flex items-center gap-2">
               {getTrendIcon(metrics.trend)}
               <span className={`text-lg font-semibold ${
@@ -140,7 +140,7 @@ export default function ForecastPanel({ historicalData, forecastData }) {
       <ForecastChart
         historicalData={historicalData}
         forecastData={forecastData}
-        title={`Projecao: ${SERIES_OPTIONS.find(s => s.value === serie)?.label} - ${MODEL_OPTIONS.find(m => m.value === modelo)?.label}`}
+        title={`Projeção: ${SERIES_OPTIONS.find(s => s.value === serie)?.label} - ${MODEL_OPTIONS.find(m => m.value === modelo)?.label}`}
         serie={serie}
         modelo={modelo}
       />
@@ -150,15 +150,15 @@ export default function ForecastPanel({ historicalData, forecastData }) {
         <div className="flex items-start gap-3">
           <Info className="w-5 h-5 text-primary-500 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-dark-600">
-            <p className="font-medium text-dark-800 mb-2">Metodologia das Projecoes</p>
+            <p className="font-medium text-dark-800 mb-2">Metodologia das Projeções</p>
             <ul className="space-y-1 text-xs">
               <li>• <strong>XGBoost:</strong> Gradient boosting com features temporais e sazonais</li>
               <li>• <strong>LightGBM:</strong> Gradient boosting otimizado para grandes volumes</li>
-              <li>• <strong>Random Forest:</strong> Ensemble de arvores de decisao</li>
+              <li>• <strong>Random Forest:</strong> Ensemble de árvores de decisão</li>
             </ul>
             <p className="mt-2 text-xs text-dark-500">
-              Features: lags (1,2,3,6,12 meses), medias moveis, componentes sazonais.
-              Intervalos de confianca calculados via bootstrap.
+              Features: lags (1,2,3,6,12 meses), médias móveis, componentes sazonais.
+              Intervalos de confiança calculados via bootstrap.
             </p>
           </div>
         </div>

@@ -1,12 +1,23 @@
 import { Loader2 } from 'lucide-react';
 
-export default function Loading() {
+export default function Loading({ progress = 0 }) {
+  const mb = progress > 0 ? (progress / (1024 * 1024)).toFixed(1).replace('.', ',') : null;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-50 to-primary-50/30 flex items-center justify-center">
-      <div className="text-center">
+      <div className="text-center max-w-xs mx-auto px-4">
         <Loader2 className="w-12 h-12 text-primary-600 animate-spin mx-auto mb-4" />
         <p className="text-dark-600 font-medium">Carregando dados...</p>
-        <p className="text-dark-400 text-sm mt-1">Aguarde um momento</p>
+        {mb ? (
+          <p className="text-dark-500 text-sm mt-1" aria-live="polite">
+            <span>{mb}</span> <span>MB carregados</span>
+          </p>
+        ) : (
+          <p className="text-dark-400 text-sm mt-1">Aguarde um momento</p>
+        )}
+        <p className="text-dark-400 text-xs mt-2">
+          Primeiro acesso: download de aproximadamente 2 MB (14 MB de dados).
+        </p>
       </div>
     </div>
   );

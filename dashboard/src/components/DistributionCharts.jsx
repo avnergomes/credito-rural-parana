@@ -11,9 +11,11 @@ import {
   LabelList,
 } from 'recharts';
 import { formatCurrency, formatPercent } from '../utils/format';
+import { ATLAS_CATEGORICAL } from '../utils/chart-palette';
 
-const GENDER_COLORS = { 'Masculino': '#3b82f6', 'Feminino': '#ec4899' };
-const PERSON_COLORS = { 'Pessoa Fisica': '#0072B2', 'Pessoa Juridica': '#c89b3c' };
+// Pares Okabe-Ito (chart-palette.js), seguros para daltonismo.
+const GENDER_COLORS = { 'Masculino': ATLAS_CATEGORICAL[0], 'Feminino': ATLAS_CATEGORICAL[4] };
+const PERSON_COLORS = { 'Pessoa Física': ATLAS_CATEGORICAL[0], 'Pessoa Jurídica': ATLAS_CATEGORICAL[1] };
 
 export default function DistributionCharts({ genero, tipoPessoa }) {
   const generoData = genero ? [
@@ -22,8 +24,8 @@ export default function DistributionCharts({ genero, tipoPessoa }) {
   ].filter(d => d.value > 0) : [];
 
   const tipoPessoaData = tipoPessoa ? [
-    { name: 'Pessoa Fisica', value: tipoPessoa.pf || 0 },
-    { name: 'Pessoa Juridica', value: tipoPessoa.pj || 0 },
+    { name: 'Pessoa Física', value: tipoPessoa.pf || 0 },
+    { name: 'Pessoa Jurídica', value: tipoPessoa.pj || 0 },
   ].filter(d => d.value > 0) : [];
 
   const hasGenero = generoData.length > 0;
@@ -99,10 +101,10 @@ export default function DistributionCharts({ genero, tipoPessoa }) {
   };
 
   const title = hasGenero && hasTipoPessoa
-    ? 'Distribuicao por Genero e Tipo de Pessoa'
+    ? 'Distribuição por Gênero e Tipo de Pessoa'
     : hasGenero
-      ? 'Distribuicao por Genero'
-      : 'Distribuicao por Tipo de Pessoa';
+      ? 'Distribuição por Gênero'
+      : 'Distribuição por Tipo de Pessoa';
 
   return (
     <div className="chart-container h-full">
@@ -111,7 +113,7 @@ export default function DistributionCharts({ genero, tipoPessoa }) {
       {hasGenero && hasTipoPessoa ? (
         <div className="space-y-6">
           <div>
-            <h4 className="text-sm font-medium text-dark-500 mb-2">Por Genero</h4>
+            <h4 className="text-sm font-medium text-dark-500 mb-2">Por Gênero</h4>
             {renderBarChart(generoData, GENDER_COLORS)}
           </div>
           <div>

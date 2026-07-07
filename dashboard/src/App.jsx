@@ -28,6 +28,7 @@ import {
   Cell,
 } from 'recharts';
 import { formatCurrency } from './utils/format';
+import { ATLAS_CATEGORICAL } from './utils/chart-palette';
 
 const TABS = [
   { id: 'visao-geral', label: 'Visão Geral', icon: 'LayoutDashboard' },
@@ -38,17 +39,19 @@ const TABS = [
   { id: 'previsoes', label: 'Previsões', icon: 'TrendingUp' },
 ];
 
+// Categoricas sempre da paleta Okabe-Ito compartilhada (chart-palette.js):
+// matizes bem separados, seguros para daltonismo.
 const FINALIDADE_COLORS = {
-  'CUSTEIO': '#2563eb',
-  'INVESTIMENTO': '#E69F00',
-  'COMERCIALIZACAO': '#c89b3c',
-  'INDUSTRIALIZACAO': '#CC79A7',
+  'CUSTEIO': ATLAS_CATEGORICAL[0],          // azul #0072B2
+  'INVESTIMENTO': ATLAS_CATEGORICAL[3],     // laranja #E69F00
+  'COMERCIALIZACAO': ATLAS_CATEGORICAL[2],  // verde-azulado #009E73
+  'INDUSTRIALIZACAO': ATLAS_CATEGORICAL[4], // roxo-avermelhado #CC79A7
 };
 
 const PROGRAMA_COLORS = {
-  'PRONAF': '#CC79A7',
-  'PRONAMP': '#06b6d4',
-  'DEMAIS': '#f97316',
+  'PRONAF': ATLAS_CATEGORICAL[4],  // roxo-avermelhado #CC79A7
+  'PRONAMP': ATLAS_CATEGORICAL[0], // azul #0072B2
+  'DEMAIS': ATLAS_CATEGORICAL[1],  // vermelhao #D55E00
 };
 
 export default function App() {
@@ -112,7 +115,7 @@ export default function App() {
   }), [filters, interactiveFilters]);
 
   // Load raw data
-  const { data, loading, error } = useData();
+  const { data, loading, error, progress, retry } = useData();
 
   // Apply combined filters and get filtered/reaggregated data
   const filteredData = useFilteredData(data, combinedFilters);
@@ -163,7 +166,7 @@ export default function App() {
   }, [filteredData?.byFinalidade]);
 
   if (loading) {
-    return <Loading />;
+    return <Loading progress={progress} />;
   }
 
   if (error) {
@@ -173,6 +176,13 @@ export default function App() {
           <div className="text-red-500 text-6xl mb-4">!</div>
           <p className="text-red-500 text-lg mb-2">Erro ao carregar dados</p>
           <p className="text-dark-500 text-sm">{error}</p>
+          <button
+            type="button"
+            onClick={retry}
+            className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
@@ -212,7 +222,7 @@ export default function App() {
             <div className="space-y-6">
               <TimeSeriesChart
                 data={filteredData?.byFinalidade}
-                title="Evolucao do Credito Rural no Parana"
+                title="Evolução do Crédito Rural no Paraná"
                 tipo="todos"
                 stacked={true}
                 showBrush={true}
@@ -231,7 +241,7 @@ export default function App() {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <TreemapChart
                   data={treemapData}
-                  title="Composicao por Programa e Finalidade"
+                  title="Composição por Programa e Finalidade"
                   onProgramaClick={(programa) => handleFilterClick('programa', programa)}
                   onFinalidadeClick={(finalidade) => handleFilterClick('finalidade', finalidade)}
                   selectedPrograma={interactiveFilters.programa}
@@ -250,7 +260,7 @@ export default function App() {
                 valueKey="valor"
                 labelKey="produto"
                 limit={15}
-                color="#2563eb"
+                color={ATLAS_CATEGORICAL[0]}
                 onClick={(produto) => handleFilterClick('produto', produto)}
                 selectedValue={interactiveFilters.produto}
               />
@@ -363,7 +373,7 @@ export default function App() {
                   valueKey="contratos"
                   labelKey="programa"
                   limit={10}
-                  color="#CC79A7"
+                  color={ATLAS_CATEGORICAL[4]}
                   onClick={(programa) => handleFilterClick('programa', programa)}
                   selectedValue={interactiveFilters.programa}
                 />
@@ -374,7 +384,7 @@ export default function App() {
                   valueKey="contratos"
                   labelKey="produto"
                   limit={10}
-                  color="#06b6d4"
+                  color={ATLAS_CATEGORICAL[5]}
                   onClick={(produto) => handleFilterClick('produto', produto)}
                   selectedValue={interactiveFilters.produto}
                 />
@@ -389,7 +399,7 @@ export default function App() {
                 <>
                   <BumpChart
                     data={filteredData?.bump}
-                    title="Ranking dos Municipios ao Longo dos Anos"
+                    title="Ranking dos Municípios ao Longo dos Anos"
                     limit={20}
                     onEntityClick={(municipio) => handleFilterClick('municipio', municipio)}
                     selectedEntity={interactiveFilters.municipio}
@@ -397,7 +407,7 @@ export default function App() {
 
                   <RankingTable
                     data={filteredData?.municipioTotals}
-                    title="Ranking de Municipios"
+                    title="Ranking de Municípios"
                     columns={['rank', 'name', 'valor', 'contratos', 'area']}
                     nameKey="name"
                     limit={100}
@@ -410,9 +420,9 @@ export default function App() {
                   <div className="flex items-start gap-3">
                     <div className="text-amber-500 text-xl">!</div>
                     <div>
-                      <h4 className="font-medium text-amber-800">Dados municipais nao disponiveis</h4>
+                      <h4 className="font-medium text-amber-800">Dados municipais não disponíveis</h4>
                       <p className="text-sm text-amber-700 mt-1">
-                        Nenhum dado encontrado para o periodo selecionado.
+                        Nenhum dado encontrado para o período selecionado.
                       </p>
                     </div>
                   </div>
@@ -440,7 +450,7 @@ export default function App() {
                 valueKey="valor"
                 labelKey="produto"
                 limit={20}
-                color="#E69F00"
+                color={ATLAS_CATEGORICAL[3]}
                 onClick={(produto) => handleFilterClick('produto', produto)}
                 selectedValue={interactiveFilters.produto}
               />
@@ -452,7 +462,7 @@ export default function App() {
             <div className="space-y-6">
               <MapChart
                 data={filteredData?.municipioTotals}
-                title="Mapa do Parana"
+                title="Mapa do Paraná"
                 metric={mapMetric}
                 onMetricChange={setMapMetric}
                 onMunicipioClick={(municipio) => handleFilterClick('municipio', municipio)}
@@ -472,12 +482,12 @@ export default function App() {
               ) : (
                 <div className="chart-container">
                   <h3 className="text-lg font-semibold text-dark-800 mb-4">
-                    Projecoes de Credito Rural
+                    Projeções de Crédito Rural
                   </h3>
                   <div className="h-64 flex flex-col items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
-                    <p className="mb-2">Dados de previsao nao disponiveis</p>
+                    <p className="mb-2">Dados de previsão não disponíveis</p>
                     <p className="text-xs text-dark-400">
-                      Execute o script generate_forecasts.py para gerar as projecoes
+                      Projeções indisponíveis no momento.
                     </p>
                   </div>
                 </div>

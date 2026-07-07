@@ -1,10 +1,20 @@
 import { Landmark, Calendar, MapPin, FileText, DollarSign } from 'lucide-react';
 import { formatNumber, formatCurrency } from '../utils/format';
 
+// Converte data ISO (2026-02-22) para o formato brasileiro (22/02/2026).
+function formatDateBr(iso) {
+  if (typeof iso !== 'string') return null;
+  const parts = iso.split('-');
+  if (parts.length !== 3) return null;
+  const [y, m, d] = parts;
+  return `${d}/${m}/${y}`;
+}
+
 export default function Header({ metadata }) {
+  const dataAtualizacao = formatDateBr(metadata?.ultimaAtualizacao);
   const stats = metadata ? [
-    { icon: Calendar, label: 'Periodo', value: `${metadata.anoMin} - ${metadata.anoMax}` },
-    { icon: MapPin, label: 'Municipios', value: formatNumber(metadata.totalMunicipios) },
+    { icon: Calendar, label: 'Período', value: `${metadata.anoMin} - ${metadata.anoMax}` },
+    { icon: MapPin, label: 'Municípios', value: formatNumber(metadata.totalMunicipios) },
     { icon: DollarSign, label: 'Total', value: formatCurrency(metadata.totalValor, true) },
     { icon: FileText, label: 'Contratos', value: formatNumber(metadata.totalContratos) },
   ] : [];
@@ -37,8 +47,13 @@ export default function Header({ metadata }) {
                 Crédito Rural Paraná
               </h1>
               <p className="text-primary-100 text-sm md:text-base mt-1">
-                Financiamento Agropecuário — BCB/SICOR
+                Financiamento Agropecuário: BCB/SICOR
               </p>
+              {dataAtualizacao && (
+                <p className="text-primary-200/80 text-xs mt-1">
+                  <span>Dados atualizados em</span> <span>{dataAtualizacao}</span>
+                </p>
+              )}
             </div>
           </div>
 

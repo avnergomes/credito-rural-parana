@@ -59,7 +59,7 @@ export default function SankeyChart({ data, title, filterNote, onNodeClick }) {
       <div className="chart-container">
         <h3 className="text-lg font-semibold text-dark-800 mb-4">{title}</h3>
         <div className="flex items-center justify-center text-dark-400 bg-dark-50 rounded-lg" style={{ height: '480px' }}>
-          Dados insuficientes para o grafico Sankey
+          Dados insuficientes para o gráfico Sankey
         </div>
       </div>
     );

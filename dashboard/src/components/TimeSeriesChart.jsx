@@ -12,12 +12,15 @@ import {
   Brush
 } from 'recharts';
 import { formatCurrency, formatNumber } from '../utils/format';
+import { ATLAS_CATEGORICAL } from '../utils/chart-palette';
 
+// Okabe-Ito (chart-palette.js): matizes bem separados entre as faixas
+// empilhadas, seguros para daltonismo.
 const COLORS = {
-  custeio: '#2563eb',
-  investimento: '#E69F00',
-  comercializacao: '#c89b3c',
-  total: '#7a4e88',
+  custeio: ATLAS_CATEGORICAL[0],         // azul #0072B2
+  investimento: ATLAS_CATEGORICAL[3],    // laranja #E69F00
+  comercializacao: ATLAS_CATEGORICAL[2], // verde-azulado #009E73
+  total: ATLAS_CATEGORICAL[7],           // atlas ink
 };
 
 export default function TimeSeriesChart({
@@ -114,7 +117,7 @@ export default function TimeSeriesChart({
       <div className="chart-container">
         <h3 className="text-lg font-semibold text-dark-800 mb-4">{title}</h3>
         <div className="h-64 flex items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
-          Nenhum dado disponivel
+          Nenhum dado disponível
         </div>
       </div>
     );
@@ -179,7 +182,7 @@ export default function TimeSeriesChart({
               <Area
                 type="monotone"
                 dataKey="comercializacao"
-                name="Comercializacao"
+                name="Comercialização"
                 stackId={stacked ? '1' : undefined}
                 stroke={COLORS.comercializacao}
                 fill={COLORS.comercializacao}

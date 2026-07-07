@@ -18,6 +18,16 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
   const finalidadeOptions = finalidades || ['CUSTEIO', 'INVESTIMENTO', 'COMERCIALIZACAO'];
   const programaOptions = programas || ['PRONAF', 'PRONAMP', 'DEMAIS'];
 
+  // Rotulos legiveis (com acentuacao) para os codigos vindos dos dados.
+  const FINALIDADE_LABELS = {
+    CUSTEIO: 'Custeio',
+    INVESTIMENTO: 'Investimento',
+    COMERCIALIZACAO: 'Comercialização',
+    INDUSTRIALIZACAO: 'Industrialização',
+  };
+  const finalidadeLabel = (f) =>
+    FINALIDADE_LABELS[f] || f.charAt(0) + f.slice(1).toLowerCase();
+
   const activeCount = useMemo(() => {
     let count = 0;
     if (filters.finalidade) count++;
@@ -99,7 +109,7 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
                 <option value="">Todas</option>
                 {finalidadeOptions.map((f) => (
                   <option key={f} value={f}>
-                    {f.charAt(0) + f.slice(1).toLowerCase()}
+                    {finalidadeLabel(f)}
                   </option>
                 ))}
               </select>

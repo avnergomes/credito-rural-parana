@@ -25,9 +25,9 @@ export default function Footer() {
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </li>
-              <li>Sistema de Operacoes do Credito Rural e do Proagro</li>
+              <li>Sistema de Operações do Crédito Rural e do Proagro</li>
             </ul>
-            <p className="text-xs text-dark-500">Filtragem: Parana (PR), 2013-2026</p>
+            <p className="text-xs text-dark-500">Filtragem: Paraná (PR), 2013-2026</p>
           </div>
 
           {/* Datageo Parana */}
@@ -39,7 +39,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="hover:text-primary-400 transition-colors inline-flex items-center gap-1"
               >
-                Datageo Parana
+                Datageo Paraná
                 <ExternalLink className="w-3 h-3" />
               </a>
             </h4>
@@ -50,7 +50,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                VBP Parana
+                VBP Paraná
               </a>
               <a
                 href="https://avnergomes.github.io/comexstat-parana/"
@@ -58,7 +58,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                ComexStat Parana
+                ComexStat Paraná
               </a>
               <a
                 href="https://avnergomes.github.io/precos-diarios/"
@@ -66,7 +66,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Precos Diarios
+                Preços Diários
               </a>
               <a
                 href="https://avnergomes.github.io/precos-florestais/"
@@ -74,7 +74,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Precos Florestais
+                Preços Florestais
               </a>
               <a
                 href="https://avnergomes.github.io/precos-de-terras/"
@@ -82,7 +82,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Precos de Terras
+                Preços de Terras
               </a>
               <a
                 href="https://avnergomes.github.io/emprego-agro-parana/"
@@ -98,7 +98,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Censo Parana
+                Censo Paraná
               </a>
               <a
                 href="https://avnergomes.github.io/saude-parana/"
@@ -106,7 +106,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Saude Parana
+                Saúde Paraná
               </a>
               <a
                 href="https://avnergomes.github.io/seguranca-parana/"
@@ -114,7 +114,7 @@ export default function Footer() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center px-2.5 py-1 text-[10px] rounded-full border border-dark-700 text-dark-300 hover:text-primary-400 hover:border-primary-500 transition-colors"
               >
-                Seguranca Parana
+                Segurança Paraná
               </a>
             </div>
           </div>
@@ -140,7 +140,7 @@ export default function Footer() {
 
         {/* Bottom */}
         <div className="mt-6 pt-4 border-t border-dark-700 flex items-center justify-between text-[10px] text-dark-500">
-          <p>&copy; {currentYear} Credito Rural Parana. Dados publicos.</p>
+          <p>&copy; {currentYear} Crédito Rural Paraná. Dados públicos.</p>
         </div>
       </div>
     </footer>

@@ -20,7 +20,7 @@ export default function RankingTable({
     name: { label: 'Nome', width: 'flex-1', align: 'text-left' },
     valor: { label: 'Valor (R$)', width: 'w-32', align: 'text-right' },
     contratos: { label: 'Contratos', width: 'w-24', align: 'text-right' },
-    area: { label: 'Area (ha)', width: 'w-28', align: 'text-right' },
+    area: { label: 'Área (ha)', width: 'w-28', align: 'text-right' },
     variacao: { label: 'Var %', width: 'w-20', align: 'text-right' },
   };
 

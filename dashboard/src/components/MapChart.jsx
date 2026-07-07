@@ -6,6 +6,56 @@ import { formatCurrency, formatNumber } from '../utils/format';
 import { useGeoJSON } from '../hooks/useData';
 import 'leaflet/dist/leaflet.css';
 
+// Dispositivos sem hover (celular/tablet): o tap abre um popup com os
+// valores em vez de aplicar o filtro direto, e o arraste de um dedo fica
+// com a pagina (nao com o mapa).
+const IS_TOUCH = typeof window !== 'undefined' &&
+  typeof window.matchMedia === 'function' &&
+  window.matchMedia('(hover: none)').matches;
+
+// Monta o conteudo do popup (toque) com nome, valores e botao "Filtrar
+// painel". Construido via DOM (textContent) para evitar injecao de HTML.
+function buildPopupContent(name, itemData, onFilter) {
+  const root = document.createElement('div');
+  root.style.cssText = 'font:13px/1.5 "IBM Plex Sans",system-ui,sans-serif;color:#1e293b;min-width:150px';
+
+  const title = document.createElement('div');
+  title.style.cssText = 'font-weight:600;margin-bottom:4px';
+  title.textContent = name || '';
+  root.appendChild(title);
+
+  const addRow = (label, value) => {
+    const row = document.createElement('div');
+    const l = document.createElement('span');
+    l.textContent = label;
+    const v = document.createElement('span');
+    v.textContent = ` ${value}`;
+    row.appendChild(l);
+    row.appendChild(v);
+    root.appendChild(row);
+  };
+
+  if (itemData) {
+    if (itemData.valor !== undefined) addRow('Valor:', formatCurrency(itemData.valor, true));
+    if (itemData.contratos !== undefined) addRow('Contratos:', formatNumber(itemData.contratos));
+    if (itemData.area !== undefined) addRow('Área:', `${formatNumber(itemData.area)} ha`);
+
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = 'Filtrar painel';
+    btn.style.cssText = 'margin-top:8px;padding:6px 12px;border:0;border-radius:6px;background:#0072B2;color:#fff;font-size:12px;font-weight:600;cursor:pointer';
+    btn.onclick = onFilter;
+    root.appendChild(btn);
+  } else {
+    const empty = document.createElement('div');
+    empty.style.cssText = 'color:#64748b';
+    empty.textContent = 'Sem dados para os filtros atuais';
+    root.appendChild(empty);
+  }
+
+  return root;
+}
+
 // Color scale
 const COLOR_SCALE = [
   '#f7fbff', '#deebf7', '#c6dbef', '#9ecae1',
@@ -73,7 +123,7 @@ export default function MapChart({
   onMunicipioClick,
   selectedMunicipio,
 }) {
-  const { geoJSON, loading: geoLoading } = useGeoJSON();
+  const { geoJSON, loading: geoLoading, retry: retryGeo } = useGeoJSON();
   const [hoveredFeature, setHoveredFeature] = useState(null);
   const [localMetric, setLocalMetric] = useState(metric);
   const mapRef = useRef(null);
@@ -161,7 +211,19 @@ export default function MapChart({
         setHoveredFeature(null);
         e.target.setStyle(getStyle(feature));
       },
-      click: () => {
+      click: (e) => {
+        if (IS_TOUCH) {
+          // Em touch nao existe mouseover: o tap mostra os valores num
+          // popup e o filtro so aplica pelo botao explicito.
+          const content = buildPopupContent(name, itemData, () => {
+            if (onMunicipioClick && itemData) {
+              onMunicipioClick(itemData.municipio || name);
+            }
+            e.target.closePopup();
+          });
+          e.target.bindPopup(content, { maxWidth: 220 }).openPopup(e.latlng);
+          return;
+        }
         if (onMunicipioClick && itemData) {
           onMunicipioClick(itemData.municipio || name);
         }
@@ -181,11 +243,20 @@ export default function MapChart({
   }
 
   if (!geoJSON) {
+    // Falha ao baixar a malha municipal (CDN externa pode estar bloqueada):
+    // erro localizado dentro da caixa do mapa, com refetch sem recarregar.
     return (
       <div className="chart-container">
-        <h3>{title}</h3>
-        <div className="h-96 flex items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
-          GeoJSON nao disponivel
+        <h3 className="text-lg font-semibold text-dark-800 mb-4">{title}</h3>
+        <div className="h-96 flex flex-col items-center justify-center gap-3 text-dark-500 bg-dark-50 rounded-lg px-6 text-center">
+          <p>Não foi possível carregar o mapa. Verifique sua conexão e tente novamente.</p>
+          <button
+            type="button"
+            onClick={retryGeo}
+            className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
+          >
+            Tentar novamente
+          </button>
         </div>
       </div>
     );
@@ -211,7 +282,7 @@ export default function MapChart({
           >
             <option value="valor">Valor</option>
             <option value="contratos">Contratos</option>
-            <option value="area">Area</option>
+            <option value="area">Área</option>
           </select>
         </div>
       </div>
@@ -222,7 +293,8 @@ export default function MapChart({
           center={[-24.5, -51.5]}
           zoom={7}
           style={{ height: '100%', width: '100%' }}
-          scrollWheelZoom={true}
+          scrollWheelZoom={false}
+          dragging={!IS_TOUCH}
         >
           <TileLayer
             attribution='&copy; <a href="https://carto.com/">CARTO</a>'
@@ -258,7 +330,7 @@ export default function MapChart({
             )}
             {hoveredFeature.area !== undefined && (
               <div className="text-sm text-dark-600">
-                Area: {formatNumber(hoveredFeature.area)} ha
+                Área: {formatNumber(hoveredFeature.area)} ha
               </div>
             )}
           </div>

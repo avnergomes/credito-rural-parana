@@ -39,6 +39,22 @@
           bar.appendChild(a);
           bar.appendChild(btn);
           document.body.appendChild(bar);
+
+          // Empilha o convite acima do banner LGPD quando os dois estao
+          // visiveis, para nenhum deles cobrir o outro (botao "Entendi"
+          // sempre alcancavel). Recalcula quando o LGPD fechar ou a tela
+          // mudar de tamanho.
+          function reposition() {
+            var lgpd = document.getElementById('lgpd-banner');
+            var visible = lgpd && lgpd.style.display !== 'none' && lgpd.offsetHeight > 0;
+            bar.style.bottom = (visible ? lgpd.offsetHeight : 0) + 'px';
+          }
+          reposition();
+          window.addEventListener('resize', reposition);
+          var lgpdEl = document.getElementById('lgpd-banner');
+          if (lgpdEl && typeof MutationObserver === 'function') {
+            new MutationObserver(reposition).observe(lgpdEl, { attributes: true, attributeFilter: ['style'] });
+          }
         }
         if (document.readyState === 'loading') {
           document.addEventListener('DOMContentLoaded', mount);
@@ -68,7 +84,7 @@
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Dashboard de Crédito Rural do Paraná - Dados BCB/SICOR" />
-    <meta name="theme-color" content="#2563eb" />
+    <meta name="theme-color" content="#14110c" />
     <link rel="canonical" href="https://avnergomes.github.io/credito-rural-parana/" />
 
     <!-- Open Graph -->
@@ -88,7 +104,7 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-    <title>Crédito Rural Paraná - BCB/SICOR</title>
+    <title>Crédito Rural Paraná - BCB/SICOR | Datageo Paraná</title>
   
     <!-- ATLAS-I18N-PANEL-V2 -->
     <link rel="stylesheet" href="./i18n/i18n-switcher.css" />
@@ -107,12 +123,35 @@
       @media (max-width: 640px) {
         .lang-fixed { top: 8px; right: 8px; }
       }
+      /* Skeleton estatico exibido antes de o React montar (primeira dobra
+         nao fica em tela branca durante o download do bundle). */
+      #root:empty::before { content: ''; }
+      .boot-skeleton {
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        background: linear-gradient(135deg, #f8fafc, #eef2f7);
+        color: #475569;
+        font: 14px/1.5 'IBM Plex Sans', system-ui, sans-serif;
+      }
+      .boot-skeleton .boot-spinner {
+        width: 40px;
+        height: 40px;
+        border: 3px solid #d4c8a8;
+        border-top-color: #0072B2;
+        border-radius: 50%;
+        animation: boot-spin 0.9s linear infinite;
+      }
+      @keyframes boot-spin { to { transform: rotate(360deg); } }
     </style>
   </head>
   <body>
     <div class="lang-fixed" data-i18n-switcher></div>
 
-    <div id="root"></div>
+    <div id="root"><div class="boot-skeleton"><div class="boot-spinner" aria-hidden="true"></div><p>Carregando painel...</p></div></div>
     <script type="module" src="/src/main.jsx"></script>
 
     <!-- Analytics Tracking Script - Dados anonimizados (Art. 12 LGPD) -->
