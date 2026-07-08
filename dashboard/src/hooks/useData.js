@@ -2,7 +2,33 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { feature } from 'topojson-client';
 
 const BASE_URL = import.meta.env.BASE_URL || '/credito-rural-parana/';
-const TOPO_URL = 'https://cdn.jsdelivr.net/gh/datageoparana/datageoparana.github.io@main/assets/parana-municipalities.topojson';
+// Malha municipal reduzida self-hosted (mesmas propriedades e object key
+// 'municipalities'); o CDN do jsdelivr fica como fallback para redes que
+// bloqueiem o dominio self-hosted.
+const TOPO_URL = 'https://datageoparana.github.io/assets/parana-municipalities.min.topojson';
+const TOPO_URL_FALLBACK = 'https://cdn.jsdelivr.net/gh/datageoparana/datageoparana.github.io@main/assets/parana-municipalities.topojson';
+
+/**
+ * Busca o TopoJSON municipal tentando primeiro a malha self-hosted e, em
+ * qualquer falha (rede ou status != ok), o fallback no CDN antes de propagar
+ * o erro. Aborto (AbortController) propaga sem acionar o fallback.
+ * Retorna uma Response com status ok; caso contrario lanca o mesmo erro
+ * 'Falha ao carregar GeoJSON' usado no restante do fluxo.
+ */
+async function fetchTopo(signal) {
+  try {
+    const res = await fetch(TOPO_URL, { signal });
+    if (res.ok) return res;
+    // Primary respondeu com status de erro: cai para o fallback abaixo.
+  } catch (err) {
+    // Aborto deve propagar, nao acionar o fallback.
+    if (err.name === 'AbortError') throw err;
+    // Outras falhas de rede: tenta o fallback abaixo.
+  }
+  const fallbackRes = await fetch(TOPO_URL_FALLBACK, { signal });
+  if (!fallbackRes.ok) throw new Error('Falha ao carregar GeoJSON');
+  return fallbackRes;
+}
 
 /**
  * Reads a fetch Response streaming the body, reporting progress in bytes.
@@ -432,8 +458,7 @@ export function useGeoJSON() {
       try {
         setLoading(true);
         setError(null);
-        const res = await fetch(TOPO_URL, { signal });
-        if (!res.ok) throw new Error('Falha ao carregar GeoJSON');
+        const res = await fetchTopo(signal);
         const topo = await res.json();
         const data = feature(topo, topo.objects.municipalities);
         if (!signal.aborted) {
