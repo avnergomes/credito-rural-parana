@@ -76,7 +76,11 @@ export default function SankeyChart({ data, title, filterNote, onNodeClick }) {
         )}
       </div>
 
-      <div style={{ height: '480px' }}>
+      {/* overflow-x-auto: on narrow screens (≤360px) the Sankey has 300px of
+          left+right margins; the min-width keeps it at a readable size and
+          lets the user scroll horizontally within the card. */}
+      <div className="overflow-x-auto">
+      <div style={{ height: '480px', minWidth: '520px' }}>
         <ResponsiveSankey
           data={sankeyData}
           margin={{ top: 20, right: 200, bottom: 20, left: 100 }}
@@ -141,6 +145,7 @@ export default function SankeyChart({ data, title, filterNote, onNodeClick }) {
             );
           }}
         />
+      </div>
       </div>
     </div>
   );

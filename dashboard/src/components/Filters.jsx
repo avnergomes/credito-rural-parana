@@ -139,7 +139,7 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleChange('granularidade', 'anual')}
-                  className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  className={`flex-1 px-3 py-2 min-h-[44px] text-sm rounded-lg transition-colors ${
                     filters.granularidade === 'anual'
                       ? 'bg-primary-600 text-white'
                       : 'bg-dark-100 text-dark-600 hover:bg-dark-200'
@@ -149,7 +149,7 @@ export default function Filters({ filters, onChange, metadata, finalidades, prog
                 </button>
                 <button
                   onClick={() => handleChange('granularidade', 'mensal')}
-                  className={`flex-1 px-3 py-2 text-sm rounded-lg transition-colors ${
+                  className={`flex-1 px-3 py-2 min-h-[44px] text-sm rounded-lg transition-colors ${
                     filters.granularidade === 'mensal'
                       ? 'bg-primary-600 text-white'
                       : 'bg-dark-100 text-dark-600 hover:bg-dark-200'

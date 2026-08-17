@@ -190,6 +190,13 @@
     background-color: theme('colors.neutral.400');
     border-radius: 3px;
   }
+
+  /* Hides scrollbar track while preserving scroll functionality. */
+  .scrollbar-hide {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar { display: none; }
 }
 
 /* Leaflet customizations */
@@ -342,4 +349,33 @@ a:not(.no-underline):not(.tab-button):not([class*='button']):hover {
   margin-right: 0.4rem;
   vertical-align: middle;
   border: 1px solid rgba(20, 17, 12, 0.45);
+}
+
+/* ── Tab scroll arrow buttons ─────────────────────────────────────────────
+   Positioned absolutely at the left/right edges of the tab bar container
+   (which must be position:relative). Sized to 44px for touch compliance. */
+.tab-scroll-btn {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 44px;
+  background: rgba(241, 233, 214, 0.96);
+  border: 1px solid rgba(20, 17, 12, 0.18);
+  cursor: pointer;
+  color: #3c342a;
+  transition: background 0.15s;
+}
+.tab-scroll-btn.left  { left: 0; }
+.tab-scroll-btn.right { right: 0; }
+.tab-scroll-btn:hover { background: rgba(241, 233, 214, 1); border-color: rgba(20, 17, 12, 0.35); }
+.tab-scroll-btn:focus-visible { outline: 2px solid #a8482c; outline-offset: 2px; }
+
+/* ── Mobile: prevent iOS auto-zoom (triggered when font-size < 16 px) ──── */
+@media (max-width: 640px) {
+  input, select, textarea { font-size: 16px !important; }
 }

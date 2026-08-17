@@ -264,7 +264,7 @@ export default function MapChart({
 
   return (
     <div className="chart-container">
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
         <h3 className="text-lg font-semibold text-dark-800">{title}</h3>
 
         <div className="flex items-center gap-2">
@@ -278,7 +278,7 @@ export default function MapChart({
                 setLocalMetric(e.target.value);
               }
             }}
-            className="text-xs px-2 py-1 bg-dark-50 border border-dark-200 rounded cursor-pointer"
+            className="text-sm px-2 py-2 min-h-[44px] sm:min-h-0 sm:py-1 bg-dark-50 border border-dark-200 rounded cursor-pointer"
           >
             <option value="valor">Valor</option>
             <option value="contratos">Contratos</option>
