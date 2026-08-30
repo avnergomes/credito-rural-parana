@@ -1,5 +1,5 @@
 requests>=2.31
-pandas>=2.2
+pandas>=3.0.2
 numpy>=1.26
 tqdm>=4.66
 xgboost>=2.0
