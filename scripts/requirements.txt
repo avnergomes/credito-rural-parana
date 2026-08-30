@@ -1,4 +1,4 @@
-requests>=2.31
+requests>=2.33.1
 pandas>=2.2
 numpy>=1.26
 tqdm>=4.66
