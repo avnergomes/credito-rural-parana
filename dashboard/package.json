@@ -10,7 +10,7 @@
     "lint": "eslint src/"
   },
   "dependencies": {
-    "@nivo/core": "^0.84.0",
+    "@nivo/core": "^0.99.0",
     "@nivo/sankey": "^0.84.0",
     "d3": "^7.9.0",
     "leaflet": "^1.9.4",
