@@ -297,8 +297,9 @@ export default function MapChart({
           dragging={!IS_TOUCH}
         >
           <TileLayer
-            attribution='&copy; <a href="https://carto.com/">CARTO</a>'
-            url="https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png"
+            attribution='Esri, HERE, Garmin, &copy; OpenStreetMap contributors'
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+            maxNativeZoom={16}
           />
 
           {geoJSON && (
