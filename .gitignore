@@ -52,7 +52,7 @@ CLAUDE.md
 dashboard/node_modules/
 dashboard/dist/
 .pytest_cache/
-data/raw/*.json
+data/raw/
 *.tmp
 *.temp
 dashboard/public/data/municipios.geojson

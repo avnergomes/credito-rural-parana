@@ -1,206 +1,105 @@
 #!/usr/bin/env python3
 """
-Fetch data from BCB/SICOR API for Paraná state.
-Downloads rural credit data - simplified version with retry logic.
+Baixa os microdados do SICOR (BCB) usados pelo painel.
+
+A API Olinda/SICOR v2 passou a responder HTTP 500 em praticamente todos os
+endpoints (jul/2026 em diante); os arquivos brutos publicados em
+https://www.bcb.gov.br/htms/sicor/ continuam atualizados e trazem a
+granularidade de operação (produto, programa, fonte, município).
+
+Arquivos baixados para data/raw/sicor/ (fora do git):
+- SICOR_OPERACAO_BASICA_ESTADO_<ANO>.gz  operações (todas as UFs) por ano
+- SICOR_COMPLEMENTO_OPERACAO_BASICA.gz   município IBGE por operação
+- SICOR_MUTUARIOS.gz                     sexo/tipo do mutuário (CPF descartado na leitura)
+- tabelas de domínio (*.csv)
 """
 
-import json
 import sys
 import time
-import requests
-from pathlib import Path
 from datetime import datetime
+from pathlib import Path
 
-# Base URL for BCB/SICOR OData API
-BASE_URL = "https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/odata"
+import requests
 
-# Directories
-SCRIPT_DIR = Path(__file__).parent
-DATA_DIR = SCRIPT_DIR.parent / "data" / "raw"
+BASE = "https://www.bcb.gov.br/htms/sicor"
+RAW_DIR = Path(__file__).parent.parent / "data" / "raw" / "sicor"
+ANO_INICIAL = 2013  # primeiro ano publicado pelo BCB
+HEADERS = {"User-Agent": "Mozilla/5.0 (compatible; credito-rural-parana-pipeline)"}
+MAX_RETRIES = 4
+TIMEOUT = (30, 300)
 
-# Request settings - more conservative
-MAX_RETRIES = 3
-RETRY_DELAY = 10  # seconds - longer delay
-REQUEST_DELAY = 2  # seconds between requests
-PAGE_SIZE = 5000  # smaller page size to avoid 500 errors
-
-
-def ensure_directories():
-    """Create necessary directories if they don't exist."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+DOMINIOS = [
+    "Empreendimento.csv", "Programa.csv", "Subprogramas.csv", "FonteRecursos.csv",
+    "CategoriaEmitente.csv", "TipoBeneficiario.csv", "Atividade.csv", "Modalidade.csv",
+]
+AUXILIARES = ["SICOR_COMPLEMENTO_OPERACAO_BASICA.gz", "SICOR_MUTUARIOS.gz"]
 
 
-def fetch_with_retry(url: str, max_retries: int = MAX_RETRIES) -> dict:
-    """Fetch URL with retry logic."""
-    for attempt in range(max_retries):
+def remote_size(url: str) -> int | None:
+    """Content-Length do arquivo remoto; None se não existir (404)."""
+    for attempt in range(MAX_RETRIES):
         try:
-            print(f"    Request attempt {attempt + 1}...")
-            response = requests.get(url, timeout=180)
-
-            if response.status_code == 500:
-                print(f"    Server error 500, waiting {RETRY_DELAY * (attempt + 1)}s...")
-                time.sleep(RETRY_DELAY * (attempt + 1))
-                continue
-
-            response.raise_for_status()
-            content_type = response.headers.get('Content-Type', '')
-            if 'html' in content_type.lower():
-                print(f"    WARNING: Received HTML instead of JSON (Content-Type: {content_type})")
-                if attempt < max_retries - 1:
-                    time.sleep(RETRY_DELAY * (attempt + 1))
-                    continue
-                raise ValueError(f"API returned HTML instead of JSON: {content_type}")
-            return response.json()
-
-        except requests.exceptions.RequestException as e:
-            print(f"    Attempt {attempt + 1} failed: {e}")
-            if attempt < max_retries - 1:
-                wait_time = RETRY_DELAY * (attempt + 1)
-                print(f"    Waiting {wait_time}s before retry...")
-                time.sleep(wait_time)
-            else:
-                raise
-
-    # Antes retornava {"value": []} — o pipeline seguia "verde" com dados
-    # vazios e o dashboard congelava silenciosamente (500s persistentes).
-    raise RuntimeError(f"Falha apos {max_retries} tentativas (HTTP 500 persistente): {url}")
+            r = requests.head(url, headers=HEADERS, timeout=TIMEOUT, allow_redirects=True)
+            if r.status_code == 404:
+                return None
+            r.raise_for_status()
+            return int(r.headers.get("Content-Length", -1))
+        except requests.RequestException as e:
+            print(f"    HEAD falhou ({attempt + 1}/{MAX_RETRIES}): {e}")
+            time.sleep(10 * (attempt + 1))
+    raise RuntimeError(f"HEAD persistente falhou: {url}")
 
 
-def fetch_endpoint(endpoint: str, filter_expr: str = None) -> list:
-    """Fetch all data from endpoint with pagination."""
-    all_data = []
-    skip = 0
-
-    while True:
-        # Build URL
-        params = f"?$format=json&$top={PAGE_SIZE}&$skip={skip}"
-        if filter_expr:
-            params += f"&$filter={filter_expr}"
-
-        url = f"{BASE_URL}/{endpoint}{params}"
-        print(f"  Fetching skip={skip}...")
-
+def download(url: str, dest: Path, size: int) -> None:
+    """Baixa em streaming para .part e renomeia; pula se o tamanho local já confere."""
+    if dest.exists() and size > 0 and dest.stat().st_size == size:
+        print(f"  {dest.name}: em cache ({size / 1e6:.1f} MB)")
+        return
+    tmp = dest.with_suffix(dest.suffix + ".part")
+    for attempt in range(MAX_RETRIES):
         try:
-            data = fetch_with_retry(url)
-            records = data.get("value", [])
-
-            if not records:
-                break
-
-            all_data.extend(records)
-            print(f"  Total: {len(all_data)} records")
-
-            if len(records) < PAGE_SIZE:
-                break
-
-            skip += PAGE_SIZE
-            time.sleep(REQUEST_DELAY)
-
-        except Exception as e:
-            # Propagar: salvar página parcial como se fosse o total corrompe o dataset
-            print(f"  Error: {e}")
-            raise
-
-    return all_data
+            with requests.get(url, headers=HEADERS, timeout=TIMEOUT, stream=True) as r:
+                r.raise_for_status()
+                with open(tmp, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=1 << 20):
+                        f.write(chunk)
+            got = tmp.stat().st_size
+            if size > 0 and got != size:
+                raise IOError(f"tamanho {got} != esperado {size}")
+            tmp.replace(dest)
+            print(f"  {dest.name}: {got / 1e6:.1f} MB")
+            return
+        except (requests.RequestException, IOError) as e:
+            print(f"    download falhou ({attempt + 1}/{MAX_RETRIES}): {e}")
+            time.sleep(15 * (attempt + 1))
+    raise RuntimeError(f"Download persistente falhou: {url}")
 
 
-def save_data(name: str, data: list):
-    """Save data to JSON file."""
-    output_path = DATA_DIR / f"{name}.json"
+def main() -> None:
+    print(f"SICOR microdados -> {RAW_DIR}  ({datetime.now():%Y-%m-%d %H:%M})")
+    RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False)
+    alvos = [(f"{BASE}/{n}", n) for n in DOMINIOS]
+    alvos += [(f"{BASE}/DadosBrutos/{n}", n) for n in AUXILIARES]
+    for ano in range(ANO_INICIAL, datetime.now().year + 1):
+        n = f"SICOR_OPERACAO_BASICA_ESTADO_{ano}.gz"
+        alvos.append((f"{BASE}/DadosBrutos/{n}", n))
 
-    size_kb = output_path.stat().st_size / 1024
-    print(f"  Saved {len(data)} records ({size_kb:.1f} KB)")
+    faltando = []
+    for url, nome in alvos:
+        size = remote_size(url)
+        if size is None:
+            # Ano corrente pode ainda não ter sido publicado em janeiro.
+            print(f"  {nome}: não publicado (404)")
+            faltando.append(nome)
+            continue
+        download(url, RAW_DIR / nome, size)
 
-
-def main():
-    print("=" * 60)
-    print("BCB/SICOR Data Fetcher - Parana (Simplified)")
-    print(f"Started: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-
-    ensure_directories()
-
-    # Essential endpoints only - these have the main data we need
-    endpoints = [
-        # Regional data with OData filter
-        ("RegiaoUF", "nomeUF eq 'PR'"),
-        ("RegiaoUFGenero", "nomeUF eq 'PR'"),
-        ("CusteioRegiaoUFProduto", "nomeUF eq 'PR'"),
-        ("InvestRegiaoUFProduto", "nomeUF eq 'PR'"),
-        ("ComercRegiaoUFProduto", "nomeUF eq 'PR'"),
-        ("ProgramaSubprogramaRegiaoUF", "nomeUF eq 'PR'"),
-        ("MunicipioUF", "nomeUF eq 'PR'"),
-
-        # Reference tables (small, no filter)
-        ("ProgramaSubprograma", None),
-        ("Faixa", None),
-    ]
-
-    failed = []
-    for endpoint, filter_expr in endpoints:
-        print(f"\n{'='*40}")
-        print(f"Fetching: {endpoint}")
-        if filter_expr:
-            print(f"Filter: {filter_expr}")
-        print("=" * 40)
-
-        try:
-            data = fetch_endpoint(endpoint, filter_expr)
-
-            if data:
-                save_data(endpoint, data)
-            else:
-                print("  No data returned")
-                failed.append(endpoint)
-
-        except Exception as e:
-            print(f"  FAILED: {e}")
-            failed.append(endpoint)
-
-        # Pause between endpoints
-        print("  Waiting 3s before next endpoint...")
-        time.sleep(3)
-
-    fetch_ibge_municipios()
-
-    print("\n" + "=" * 60)
-    print(f"Completed: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-
-    # Summary
-    print("\nFiles created:")
-    for f in sorted(DATA_DIR.glob("*.json")):
-        size_kb = f.stat().st_size / 1024
-        print(f"  {f.name}: {size_kb:.1f} KB")
-
-    if failed:
-        # Falhar o job para o GitHub Actions notificar, em vez de seguir
-        # "verde" com dados vazios/parciais.
-        print(f"\nERRO: endpoints sem dados: {', '.join(failed)}")
+    obrigatorios = set(DOMINIOS) | set(AUXILIARES)
+    criticos = [n for n in faltando if n in obrigatorios]
+    if criticos or len(faltando) > 1:
+        print(f"ERRO: arquivos ausentes: {', '.join(faltando)}")
         sys.exit(1)
-
-
-def fetch_ibge_municipios():
-    """Baixa o mapeamento codigo->nome dos municipios do PR (IBGE)."""
-    print(f"\n{'='*40}")
-    print("Fetching: ibge_municipios (IBGE localidades)")
-    print("=" * 40)
-    try:
-        resp = requests.get(
-            "https://servicodados.ibge.gov.br/api/v1/localidades/estados/PR/municipios",
-            timeout=60,
-        )
-        resp.raise_for_status()
-        municipios = {str(m["id"]): m["nome"] for m in resp.json()}
-        with open(DATA_DIR / "ibge_municipios.json", "w", encoding="utf-8") as f:
-            json.dump(municipios, f, ensure_ascii=False)
-        print(f"  Saved {len(municipios)} municipios")
-    except Exception as e:
-        # Nao e fatal: o preprocess tem fallback para o nome vindo do BCB
-        print(f"  AVISO: falha ao baixar municipios do IBGE: {e}")
 
 
 if __name__ == "__main__":

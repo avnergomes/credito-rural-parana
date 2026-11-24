@@ -1,49 +1,29 @@
-import { X, Trash2 } from 'lucide-react';
+import { X } from 'lucide-react';
+import { DIMENSIONS } from '../data/cube';
 
-const FILTER_LABELS = {
-  finalidade: 'Finalidade',
-  programa: 'Programa',
-  produto: 'Produto',
-  municipio: 'Município',
-  ano: 'Ano',
-};
-
+/** Chips de todas as seleções ativas; cada um remove só aquele valor. */
 export default function ActiveFilters({ filters, onRemove, onClear }) {
-  // Get active filters (non-null values)
-  const activeFilters = Object.entries(filters).filter(
-    ([_, value]) => value !== null && value !== undefined
-  );
-
-  if (activeFilters.length === 0) {
-    return null;
-  }
+  const chips = Object.keys(DIMENSIONS).flatMap((d) => filters[d].map((v) => ({ d, v })));
+  if (chips.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-4">
-      <span className="text-xs text-dark-500">Filtros ativos:</span>
-
-      {activeFilters.map(([key, value]) => (
+    <div className="flex flex-wrap items-center gap-2 mb-6" aria-label="Filtros ativos">
+      {chips.map(({ d, v }) => (
         <button
-          key={key}
-          onClick={() => onRemove(key)}
-          className="active-filter-badge group"
+          key={`${d}:${v}`}
+          type="button"
+          onClick={() => onRemove(d, v)}
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 min-h-[36px] text-xs bg-primary-50 text-primary-800 border border-primary-200 rounded-full hover:bg-primary-100"
+          aria-label={`Remover filtro ${DIMENSIONS[d].label}: ${v}`}
         >
-          <span className="text-primary-400">{FILTER_LABELS[key] || key}:</span>
-          <span>{String(value)}</span>
-          <X className="w-3 h-3 opacity-50 group-hover:opacity-100 transition-opacity" />
+          <span className="text-primary-500">{DIMENSIONS[d].label}:</span>
+          <span className="max-w-[16rem] truncate">{v}</span>
+          <X className="w-3 h-3" />
         </button>
       ))}
-
-      {activeFilters.length > 1 && (
-        <button
-          onClick={onClear}
-          className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium
-                     bg-red-50 text-red-700 rounded-full border border-red-200
-                     hover:bg-red-100 hover:border-red-300
-                     transition-all duration-200 ease-in-out"
-        >
-          <Trash2 className="w-3 h-3" />
-          Limpar todos
+      {chips.length > 1 && (
+        <button type="button" onClick={onClear} className="text-xs text-dark-500 hover:text-primary-700 underline px-2 min-h-[36px]">
+          Limpar seleções
         </button>
       )}
     </div>

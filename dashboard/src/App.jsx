@@ -1,5 +1,5 @@
 // ATLAS-A11Y-HEX-SWEPT
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import Filters from './components/Filters';
@@ -16,158 +16,91 @@ import BumpChart from './components/BumpChart';
 import RankingTable from './components/RankingTable';
 import MapChart from './components/MapChart';
 import ForecastPanel from './components/ForecastPanel';
-import { useData, useFilteredData, useAggregations } from './hooks/useData';
+import ExploreTable from './components/ExploreTable';
+import { useData } from './hooks/useData';
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
-import { formatCurrency } from './utils/format';
+  EMPTY_FILTERS, DIMENSIONS, PERFIL_DIMS,
+  totals, timeSeries, ranking, sankey, bump, groupBy, perfilBy,
+} from './data/cube';
 import { ATLAS_CATEGORICAL } from './utils/chart-palette';
 
 const TABS = [
   { id: 'visao-geral', label: 'Visão Geral', icon: 'LayoutDashboard' },
-  { id: 'programas', label: 'Programas', icon: 'PieChart' },
-  { id: 'municipios', label: 'Municípios', icon: 'MapPin' },
   { id: 'produtos', label: 'Produtos', icon: 'Package' },
+  { id: 'programas', label: 'Programas e Fontes', icon: 'PieChart' },
+  { id: 'municipios', label: 'Municípios', icon: 'MapPin' },
   { id: 'mapa', label: 'Mapa', icon: 'Globe' },
+  { id: 'perfil', label: 'Perfil', icon: 'Users' },
+  { id: 'explorar', label: 'Explorar', icon: 'Table2' },
   { id: 'previsoes', label: 'Previsões', icon: 'TrendingUp' },
 ];
 
-// Categoricas sempre da paleta Okabe-Ito compartilhada (chart-palette.js):
-// matizes bem separados, seguros para daltonismo.
-const FINALIDADE_COLORS = {
-  'CUSTEIO': ATLAS_CATEGORICAL[0],          // azul #0072B2
-  'INVESTIMENTO': ATLAS_CATEGORICAL[3],     // laranja #E69F00
-  'COMERCIALIZACAO': ATLAS_CATEGORICAL[2],  // verde-azulado #009E73
-  'INDUSTRIALIZACAO': ATLAS_CATEGORICAL[4], // roxo-avermelhado #CC79A7
-};
+function Note({ children }) {
+  return (
+    <div className="chart-container bg-amber-50 border border-amber-200 text-sm text-amber-800">{children}</div>
+  );
+}
 
-const PROGRAMA_COLORS = {
-  'PRONAF': ATLAS_CATEGORICAL[4],  // roxo-avermelhado #CC79A7
-  'PRONAMP': ATLAS_CATEGORICAL[0], // azul #0072B2
-  'DEMAIS': ATLAS_CATEGORICAL[1],  // vermelhao #D55E00
-};
+/** Calcula só os dados da aba ativa. */
+function useTabData(cube, perfil, filters, tab) {
+  return useMemo(() => {
+    if (!cube) return {};
+    const r = (dim, key = 'name', f = filters) => ranking(cube, f, dim, key);
+    switch (tab) {
+      case 'visao-geral': {
+        const treemap = groupBy(cube, filters, ['grupo', 'finalidade'], { keepSelf: true })
+          .map(({ keys: [g, f], valor, contratos }) => ({ name: f, programa: g, finalidade: f, valor, contratos }));
+        return { serie: timeSeries(cube, filters), sankey: sankey(cube, filters), treemap, produtos: r('produto', 'produto'), portes: r('porte') };
+      }
+      case 'produtos':
+        return { produtos: r('produto', 'produto'), variedades: r('variedade'), atividades: r('atividade') };
+      case 'programas':
+        return { grupos: r('grupo'), programas: r('programa'), subprogramas: r('subprograma'), fontes: r('fonte'), finalidades: r('finalidade') };
+      case 'municipios':
+        return { municipios: r('municipio'), bump: bump(cube, filters) };
+      case 'mapa':
+        return { municipios: r('municipio').filter((m) => m.codIbge) };
+      case 'perfil': {
+        const sexo = perfilBy(cube, perfil, filters, 'sexo');
+        const get = (n) => sexo.find((s) => s.name === n)?.valor || 0;
+        return { genero: { feminino: get('Feminino'), masculino: get('Masculino') }, tipos: perfilBy(cube, perfil, filters, 'tipo') };
+      }
+      default:
+        return {};
+    }
+  }, [cube, perfil, filters, tab]);
+}
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('visao-geral');
-  const [filters, setFilters] = useState({
-    anoMin: null,
-    anoMax: null,
-    mesMin: null,
-    mesMax: null,
-    finalidade: null,
-    programa: null,
-    produto: null,
-    municipio: null,
-    granularidade: 'anual',
-  });
-
-  const [interactiveFilters, setInteractiveFilters] = useState({
-    finalidade: null,
-    programa: null,
-    produto: null,
-    municipio: null,
-    ano: null,
-  });
-
+  const [filters, setFilters] = useState(EMPTY_FILTERS);
+  const [granularidade, setGranularidade] = useState('anual');
   const [mapMetric, setMapMetric] = useState('valor');
 
-  const handleFilterClick = useCallback((key, value) => {
-    setInteractiveFilters(prev => ({
-      ...prev,
-      [key]: prev[key] === value ? null : value,
-    }));
-  }, []);
-
-  const handleRemoveInteractiveFilter = useCallback((key) => {
-    setInteractiveFilters(prev => ({ ...prev, [key]: null }));
-  }, []);
-
-  const clearInteractiveFilters = useCallback(() => {
-    setInteractiveFilters({
-      finalidade: null,
-      programa: null,
-      produto: null,
-      municipio: null,
-      ano: null,
-    });
-  }, []);
-
-  const hasInteractiveFilters = useMemo(() => {
-    return Object.values(interactiveFilters).some(v => v !== null);
-  }, [interactiveFilters]);
-
-  // Combine dropdown filters with interactive filters
-  const combinedFilters = useMemo(() => ({
-    ...filters,
-    // Interactive filters override dropdown filters
-    finalidade: interactiveFilters.finalidade || filters.finalidade,
-    programa: interactiveFilters.programa || filters.programa,
-    produto: interactiveFilters.produto || filters.produto,
-    municipio: interactiveFilters.municipio || filters.municipio,
-    ano: interactiveFilters.ano,
-  }), [filters, interactiveFilters]);
-
-  // Load raw data
   const { data, loading, error, progress, retry } = useData();
+  const cube = data?.cube;
 
-  // Apply combined filters and get filtered/reaggregated data
-  const filteredData = useFilteredData(data, combinedFilters);
+  const toggle = useCallback((dim, value) => {
+    if (!value || !DIMENSIONS[dim]) return;
+    setFilters((f) => ({ ...f, [dim]: f[dim].includes(value) ? f[dim].filter((v) => v !== value) : [...f[dim], value] }));
+  }, []);
+  const remove = useCallback((dim, value) => setFilters((f) => ({ ...f, [dim]: f[dim].filter((v) => v !== value) })), []);
+  const clearSelections = useCallback(
+    () => setFilters((f) => ({ ...f, ...Object.fromEntries(Object.keys(DIMENSIONS).map((d) => [d, []])) })),
+    [],
+  );
+  const resetAll = useCallback(() => setFilters(EMPTY_FILTERS), []);
+  const toggleAno = useCallback((ano) => setFilters((f) => (
+    f.anoMin === ano && f.anoMax === ano
+      ? { ...f, anoMin: null, anoMax: null }
+      : { ...f, anoMin: ano, anoMax: ano }
+  )), []);
 
-  // Calculate KPI aggregations from filtered data
-  const aggregations = useAggregations(filteredData, combinedFilters);
+  const kpis = useMemo(() => (cube ? totals(cube, filters) : null), [cube, filters]);
+  const tab = useTabData(cube, data?.perfil, filters, activeTab);
+  const perfilIgnorados = Object.keys(DIMENSIONS).filter((d) => !PERFIL_DIMS.includes(d) && filters[d].length);
 
-  // Set initial filter values when data loads
-  useEffect(() => {
-    if (data?.metadata) {
-      setFilters(prev => ({
-        ...prev,
-        anoMin: prev.anoMin || data.metadata.anoMin,
-        anoMax: prev.anoMax || data.metadata.anoMax,
-      }));
-    }
-  }, [data?.metadata]);
-
-  // Build treemap data from filtered byFinalidade (real data, not cross-join)
-  const treemapData = useMemo(() => {
-    if (!filteredData?.byFinalidade?.length) return [];
-
-    // Aggregate directly by programa + finalidade (real data)
-    const grouped = {};
-    filteredData.byFinalidade.forEach(row => {
-      const key = `${row.programa}|${row.finalidade}`;
-      if (!grouped[key]) {
-        grouped[key] = {
-          programa: row.programa,
-          finalidade: row.finalidade,
-          valor: 0,
-          contratos: 0
-        };
-      }
-      grouped[key].valor += row.valor || 0;
-      grouped[key].contratos += row.contratos || 0;
-    });
-
-    return Object.values(grouped)
-      .filter(d => d.valor > 0)
-      .map(d => ({
-        name: `${d.programa} - ${d.finalidade}`,
-        programa: d.programa,
-        finalidade: d.finalidade,
-        valor: d.valor,
-        contratos: d.contratos
-      }));
-  }, [filteredData?.byFinalidade]);
-
-  if (loading) {
-    return <Loading progress={progress} />;
-  }
+  if (loading) return <Loading progress={progress} />;
 
   if (error) {
     return (
@@ -176,11 +109,8 @@ export default function App() {
           <div className="text-red-500 text-6xl mb-4">!</div>
           <p className="text-red-500 text-lg mb-2">Erro ao carregar dados</p>
           <p className="text-dark-500 text-sm">{error}</p>
-          <button
-            type="button"
-            onClick={retry}
-            className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors"
-          >
+          <button type="button" onClick={retry}
+            className="mt-4 px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-lg hover:bg-primary-700 transition-colors">
             Tentar novamente
           </button>
         </div>
@@ -188,311 +118,105 @@ export default function App() {
     );
   }
 
+  const lolli = (rows, title, labelKey, dim, color, extra = {}) => (
+    <LollipopChart data={rows} title={title} valueKey="valor" labelKey={labelKey} limit={15} color={color}
+      onClick={(v) => toggle(dim, v)} selectedValue={filters[dim]} {...extra} />
+  );
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-dark-50 to-primary-50/30">
       <Header metadata={data?.metadata} />
 
       <main className="container mx-auto px-4 py-8">
-        {/* Filters */}
-        <Filters
-          filters={filters}
-          onChange={setFilters}
-          metadata={data?.metadata}
-          finalidades={data?.filters?.finalidades}
-          programas={data?.filters?.programas}
-        />
-
-        {/* Interactive Filters */}
-        <ActiveFilters
-          filters={interactiveFilters}
-          onRemove={handleRemoveInteractiveFilter}
-          onClear={clearInteractiveFilters}
-        />
-
-        {/* KPI Cards - uses filtered aggregations */}
-        <KpiCards totals={aggregations?.totals} />
-
-        {/* Tabs */}
+        <Filters cube={cube} filters={filters} onChange={setFilters}
+          granularidade={granularidade} onGranularidade={setGranularidade} onReset={resetAll} />
+        <ActiveFilters filters={filters} onRemove={remove} onClear={clearSelections} />
+        <KpiCards totals={kpis} />
         <Tabs tabs={TABS} activeTab={activeTab} onChange={setActiveTab} />
 
-        {/* Tab Content */}
-        <div className="mt-6">
-          {/* Visao Geral */}
+        <div className="mt-6 space-y-6">
           {activeTab === 'visao-geral' && (
-            <div className="space-y-6">
-              <TimeSeriesChart
-                data={filteredData?.byFinalidade}
-                title="Evolução do Crédito Rural no Paraná"
-                tipo="todos"
-                stacked={true}
-                showBrush={true}
-                granularidade={filters.granularidade}
-                onAnoClick={(ano) => handleFilterClick('ano', ano)}
-                selectedAno={interactiveFilters.ano}
-              />
-
-              <SankeyChart
-                data={filteredData?.sankey}
-                title="Fluxo: Programa -> Finalidade -> Produto"
-                filterNote={hasInteractiveFilters ? 'Filtros ativos' : null}
-                onNodeClick={(type, value) => handleFilterClick(type, value)}
-              />
-
+            <>
+              <TimeSeriesChart data={tab.serie} title="Evolução do crédito rural no Paraná" tipo="todos" stacked
+                showBrush granularidade={granularidade} onAnoClick={toggleAno}
+                selectedAno={filters.anoMin != null && filters.anoMin === filters.anoMax ? filters.anoMin : null} />
+              <SankeyChart data={tab.sankey} title="Fluxo: grupo de programa → finalidade → produto"
+                onNodeClick={(type, value) => toggle(type, value)} />
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <TreemapChart
-                  data={treemapData}
-                  title="Composição por Programa e Finalidade"
-                  onProgramaClick={(programa) => handleFilterClick('programa', programa)}
-                  onFinalidadeClick={(finalidade) => handleFilterClick('finalidade', finalidade)}
-                  selectedPrograma={interactiveFilters.programa}
-                  selectedFinalidade={interactiveFilters.finalidade}
-                />
-
-                <DistributionCharts
-                  genero={filteredData?.byGenero}
-                  tipoPessoa={null}
-                />
+                <TreemapChart data={tab.treemap} title="Composição por grupo de programa e finalidade"
+                  onProgramaClick={(v) => toggle('grupo', v)} onFinalidadeClick={(v) => toggle('finalidade', v)}
+                  selectedPrograma={filters.grupo} selectedFinalidade={filters.finalidade} />
+                {lolli(tab.portes, 'Valor por porte do produtor', 'name', 'porte', ATLAS_CATEGORICAL[1])}
               </div>
-
-              <LollipopChart
-                data={filteredData?.produtoTotals}
-                title="Top 15 Produtos por Valor"
-                valueKey="valor"
-                labelKey="produto"
-                limit={15}
-                color={ATLAS_CATEGORICAL[0]}
-                onClick={(produto) => handleFilterClick('produto', produto)}
-                selectedValue={interactiveFilters.produto}
-              />
-            </div>
+              {lolli(tab.produtos, 'Top 15 produtos por valor', 'produto', 'produto', ATLAS_CATEGORICAL[0])}
+            </>
           )}
 
-          {/* Programas */}
-          {activeTab === 'programas' && (
-            <div className="space-y-6">
-              {/* Valor por Programa */}
-              <div className="chart-container">
-                <h3 className="text-lg font-semibold text-dark-800 mb-4">Valor por Programa</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={filteredData?.programaTotals || []}
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis
-                        type="number"
-                        tickFormatter={(v) => formatCurrency(v, true)}
-                        tick={{ fontSize: 11, fill: '#6e6453' }}
-                      />
-                      <YAxis
-                        dataKey="programa"
-                        type="category"
-                        tick={{ fontSize: 12, fill: '#475569' }}
-                        width={90}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(value, true), 'Valor']}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar
-                        dataKey="valor"
-                        radius={[0, 4, 4, 0]}
-                        onClick={(data) => handleFilterClick('programa', data.programa)}
-                        cursor="pointer"
-                      >
-                        {(filteredData?.programaTotals || []).map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={PROGRAMA_COLORS[entry.programa] || '#918058'}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Valor por Finalidade */}
-              <div className="chart-container">
-                <h3 className="text-lg font-semibold text-dark-800 mb-4">Valor por Finalidade</h3>
-                <div className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={filteredData?.finalidadeTotals || []}
-                      layout="vertical"
-                      margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis
-                        type="number"
-                        tickFormatter={(v) => formatCurrency(v, true)}
-                        tick={{ fontSize: 11, fill: '#6e6453' }}
-                      />
-                      <YAxis
-                        dataKey="finalidade"
-                        type="category"
-                        tick={{ fontSize: 12, fill: '#475569' }}
-                        width={110}
-                      />
-                      <Tooltip
-                        formatter={(value) => [formatCurrency(value, true), 'Valor']}
-                        contentStyle={{
-                          backgroundColor: 'white',
-                          border: '1px solid #e2e8f0',
-                          borderRadius: '8px',
-                        }}
-                      />
-                      <Bar
-                        dataKey="valor"
-                        radius={[0, 4, 4, 0]}
-                        onClick={(data) => handleFilterClick('finalidade', data.finalidade)}
-                        cursor="pointer"
-                      >
-                        {(filteredData?.finalidadeTotals || []).map((entry, index) => (
-                          <Cell
-                            key={`cell-${index}`}
-                            fill={FINALIDADE_COLORS[entry.finalidade] || '#918058'}
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <LollipopChart
-                  data={filteredData?.programaTotals}
-                  title="Contratos por Programa"
-                  valueKey="contratos"
-                  labelKey="programa"
-                  limit={10}
-                  color={ATLAS_CATEGORICAL[4]}
-                  onClick={(programa) => handleFilterClick('programa', programa)}
-                  selectedValue={interactiveFilters.programa}
-                />
-
-                <LollipopChart
-                  data={filteredData?.produtoTotals}
-                  title="Top 10 Produtos por Contratos"
-                  valueKey="contratos"
-                  labelKey="produto"
-                  limit={10}
-                  color={ATLAS_CATEGORICAL[5]}
-                  onClick={(produto) => handleFilterClick('produto', produto)}
-                  selectedValue={interactiveFilters.produto}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Municipios */}
-          {activeTab === 'municipios' && (
-            <div className="space-y-6">
-              {filteredData?.municipioTotals?.length > 0 ? (
-                <>
-                  <BumpChart
-                    data={filteredData?.bump}
-                    title="Ranking dos Municípios ao Longo dos Anos"
-                    limit={20}
-                    onEntityClick={(municipio) => handleFilterClick('municipio', municipio)}
-                    selectedEntity={interactiveFilters.municipio}
-                  />
-
-                  <RankingTable
-                    data={filteredData?.municipioTotals}
-                    title="Ranking de Municípios"
-                    columns={['rank', 'name', 'valor', 'contratos', 'area']}
-                    nameKey="name"
-                    limit={100}
-                    onRowClick={(municipio) => handleFilterClick('municipio', municipio)}
-                    selectedRow={interactiveFilters.municipio}
-                  />
-                </>
-              ) : (
-                <div className="chart-container bg-amber-50 border border-amber-200">
-                  <div className="flex items-start gap-3">
-                    <div className="text-amber-500 text-xl">!</div>
-                    <div>
-                      <h4 className="font-medium text-amber-800">Dados municipais não disponíveis</h4>
-                      <p className="text-sm text-amber-700 mt-1">
-                        Nenhum dado encontrado para o período selecionado.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Produtos */}
           {activeTab === 'produtos' && (
-            <div className="space-y-6">
-              <RankingTable
-                data={filteredData?.produtoTotals}
-                title="Ranking de Produtos"
-                columns={['rank', 'name', 'valor', 'contratos']}
-                nameKey="produto"
-                limit={50}
-                onRowClick={(produto) => handleFilterClick('produto', produto)}
-                selectedRow={interactiveFilters.produto}
-              />
-
-              <LollipopChart
-                data={filteredData?.produtoTotals}
-                title="Top 20 Produtos por Valor"
-                valueKey="valor"
-                labelKey="produto"
-                limit={20}
-                color={ATLAS_CATEGORICAL[3]}
-                onClick={(produto) => handleFilterClick('produto', produto)}
-                selectedValue={interactiveFilters.produto}
-              />
-            </div>
+            <>
+              <RankingTable data={tab.produtos} title="Ranking de produtos" columns={['rank', 'name', 'valor', 'contratos', 'area']}
+                nameKey="produto" limit={300} onRowClick={(v) => toggle('produto', v)} selectedRow={filters.produto} />
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {lolli(tab.variedades, 'Variedades (refine pelo produto)', 'name', 'variedade', ATLAS_CATEGORICAL[3])}
+                {lolli(tab.atividades, 'Atividade', 'name', 'atividade', ATLAS_CATEGORICAL[5])}
+              </div>
+            </>
           )}
 
-          {/* Mapa */}
+          {activeTab === 'programas' && (
+            <>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {lolli(tab.grupos, 'Grupo de programa', 'name', 'grupo', ATLAS_CATEGORICAL[4])}
+                {lolli(tab.finalidades, 'Finalidade', 'name', 'finalidade', ATLAS_CATEGORICAL[0])}
+              </div>
+              {lolli(tab.programas, 'Programas', 'name', 'programa', ATLAS_CATEGORICAL[4])}
+              {lolli(tab.subprogramas, 'Subprogramas', 'name', 'subprograma', ATLAS_CATEGORICAL[2], { limit: 20 })}
+              {lolli(tab.fontes, 'Fontes de recursos', 'name', 'fonte', ATLAS_CATEGORICAL[3])}
+            </>
+          )}
+
+          {activeTab === 'municipios' && (
+            <>
+              <Note>
+                O BCB não publica o município de parte das operações, sobretudo de médio e grande produtor. Elas aparecem
+                na linha &quot;Não informado&quot; e entram em todos os totais. No recorte atual,{' '}
+                <strong>{kpis?.coberturaMunicipio != null ? Math.round(kpis.coberturaMunicipio * 100) : '–'}%</strong> do valor tem município.
+              </Note>
+              <BumpChart data={tab.bump} title="Ranking dos municípios ao longo dos anos" limit={20}
+                onEntityClick={(v) => toggle('municipio', v)} selectedEntity={filters.municipio} />
+              <RankingTable data={tab.municipios} title="Ranking de municípios" columns={['rank', 'name', 'valor', 'contratos', 'area']}
+                nameKey="name" limit={400} onRowClick={(v) => toggle('municipio', v)} selectedRow={filters.municipio} />
+            </>
+          )}
+
           {activeTab === 'mapa' && (
-            <div className="space-y-6">
-              <MapChart
-                data={filteredData?.municipioTotals}
-                title="Mapa do Paraná"
-                metric={mapMetric}
-                onMetricChange={setMapMetric}
-                onMunicipioClick={(municipio) => handleFilterClick('municipio', municipio)}
-                selectedMunicipio={interactiveFilters.municipio}
-              />
-            </div>
+            <MapChart data={tab.municipios} title="Mapa do Paraná (operações com município informado)" metric={mapMetric}
+              onMetricChange={setMapMetric} onMunicipioClick={(v) => toggle('municipio', v)} selectedMunicipio={filters.municipio} />
           )}
 
-          {/* Previsoes */}
+          {activeTab === 'perfil' && (
+            <>
+              <Note>
+                Perfil do mutuário principal de cada operação, em recorte estadual (sem município, para não expor
+                células com poucos contratos). Responde a período, finalidade, programa e porte. As mesmas operações
+                sem município publicado também vêm sem dados do mutuário e aparecem como &quot;Não informado&quot;.
+                {perfilIgnorados.length > 0 && (
+                  <> Filtros ignorados aqui: <strong>{perfilIgnorados.map((d) => DIMENSIONS[d].label).join(', ')}</strong>.</>
+                )}
+              </Note>
+              <DistributionCharts genero={tab.genero} tipoPessoa={null} />
+              <LollipopChart data={tab.tipos} title="Valor por tipo de beneficiário" valueKey="valor" labelKey="name" limit={15} color={ATLAS_CATEGORICAL[5]} />
+            </>
+          )}
+
+          {activeTab === 'explorar' && <ExploreTable cube={cube} filters={filters} />}
+
           {activeTab === 'previsoes' && (
-            <div className="space-y-6">
-              {filteredData?.forecasts ? (
-                <ForecastPanel
-                  historicalData={filteredData?.byMes?.length > 0 ? filteredData.byMes : filteredData?.byAno}
-                  forecastData={filteredData?.forecasts}
-                />
-              ) : (
-                <div className="chart-container">
-                  <h3 className="text-lg font-semibold text-dark-800 mb-4">
-                    Projeções de Crédito Rural
-                  </h3>
-                  <div className="h-64 flex flex-col items-center justify-center text-dark-400 bg-dark-50 rounded-lg">
-                    <p className="mb-2">Dados de previsão não disponíveis</p>
-                    <p className="text-xs text-dark-400">
-                      Projeções indisponíveis no momento.
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
+            data?.forecasts ? (
+              <ForecastPanel historicalData={data.byMes} forecastData={data.forecasts} />
+            ) : (
+              <Note>Projeções indisponíveis no momento.</Note>
+            )
           )}
         </div>
       </main>

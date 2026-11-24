@@ -17,7 +17,7 @@ permissions:
 jobs:
   process:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 75  # ~1,5 GB de microdados do BCB
 
     steps:
       - name: Checkout
@@ -34,7 +34,10 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: Fetch data from BCB API
+      - name: Test preprocess (fixture)
+        run: python scripts/test_preprocess.py
+
+      - name: Fetch SICOR microdata (BCB)
         run: python scripts/fetch_data.py
 
       - name: Process data

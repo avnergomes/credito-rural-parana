@@ -5,6 +5,7 @@ import * as d3 from 'd3';
 import { formatCurrency, formatNumber } from '../utils/format';
 import { useGeoJSON } from '../hooks/useData';
 import 'leaflet/dist/leaflet.css';
+import { isSelected } from '../utils/selection';
 
 // Dispositivos sem hover (celular/tablet): o tap abre um popup com os
 // valores em vez de aplicar o filtro direto, e o arraste de um dedo fica
@@ -175,15 +176,14 @@ export default function MapChart({
     const itemData = dataLookup[code6] || dataLookup[code] || (name ? dataLookup[name.toUpperCase()] : null);
     const value = itemData?.[activeMetric] || 0;
 
-    const isSelected = selectedMunicipio &&
-      (itemData?.municipio === selectedMunicipio || code === selectedMunicipio);
+    const isSel = isSelected(selectedMunicipio, itemData?.name) || isSelected(selectedMunicipio, name);
 
     return {
       fillColor: value > 0 && colorScale ? colorScale(value) : '#f1f5f9',
-      weight: isSelected ? 2 : 0.5,
+      weight: isSel ? 2 : 0.5,
       opacity: 1,
-      color: isSelected ? '#2563eb' : '#918058',
-      fillOpacity: isSelected ? 0.9 : 0.7,
+      color: isSel ? '#2563eb' : '#918058',
+      fillOpacity: isSel ? 0.9 : 0.7,
     };
   };
 
@@ -217,7 +217,7 @@ export default function MapChart({
           // popup e o filtro so aplica pelo botao explicito.
           const content = buildPopupContent(name, itemData, () => {
             if (onMunicipioClick && itemData) {
-              onMunicipioClick(itemData.municipio || name);
+              onMunicipioClick(itemData.name || itemData.municipio || name);
             }
             e.target.closePopup();
           });
@@ -225,7 +225,7 @@ export default function MapChart({
           return;
         }
         if (onMunicipioClick && itemData) {
-          onMunicipioClick(itemData.municipio || name);
+          onMunicipioClick(itemData.name || itemData.municipio || name);
         }
       },
     });

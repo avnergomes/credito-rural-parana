@@ -12,12 +12,16 @@ const COLORS = {
   'CUSTEIO': '#2563eb',
   'INVESTIMENTO': '#E69F00',
   'COMERCIALIZACAO': '#c89b3c',
+  'Custeio': '#2563eb',
+  'Investimento': '#E69F00',
+  'Comercialização': '#c89b3c',
+  'Industrialização': '#CC79A7',
   // Default
   'default': '#918058',
 };
 
 const PROGRAMAS = ['PRONAF', 'PRONAMP', 'DEMAIS'];
-const FINALIDADES = ['CUSTEIO', 'INVESTIMENTO', 'COMERCIALIZACAO', 'INDUSTRIALIZACAO'];
+const FINALIDADES = ['CUSTEIO', 'INVESTIMENTO', 'COMERCIALIZACAO', 'INDUSTRIALIZACAO', 'Custeio', 'Investimento', 'Comercialização', 'Industrialização'];
 
 const truncateLabel = (label, maxLength = 22) => {
   if (!label) return '';
@@ -105,9 +109,9 @@ export default function SankeyChart({ data, title, filterNote, onNodeClick }) {
             if (onNodeClick && node.id) {
               // Determine the type based on node structure or label
               const label = node.label || node.id;
-              const type = node.type ||
-                (COLORS[label] && ['PRONAF', 'PRONAMP', 'DEMAIS'].includes(label) ? 'programa' :
-                 ['CUSTEIO', 'INVESTIMENTO', 'COMERCIALIZACAO'].includes(label) ? 'finalidade' : 'produto');
+              // Tipo pelo prefixo do id (prog_/fin_/prod_), robusto a rótulos acentuados.
+              const prefix = String(node.id).split('_')[0];
+              const type = node.type || { prog: 'grupo', fin: 'finalidade', prod: 'produto' }[prefix] || 'produto';
               onNodeClick(type, label);
             }
           }}

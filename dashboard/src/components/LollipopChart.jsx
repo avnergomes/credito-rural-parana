@@ -2,6 +2,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency, formatNumber } from '../utils/format';
+import { isSelected } from '../utils/selection';
 
 export default function LollipopChart({
   data,
@@ -91,9 +92,9 @@ export default function LollipopChart({
       .attr('class', 'lollipop-circle')
       .attr('cx', d => xScale(d.value))
       .attr('cy', d => yScale(d.label) + yScale.bandwidth() / 2)
-      .attr('r', d => selectedValue === d.label ? 8 : 6)
-      .attr('fill', d => selectedValue === d.label ? d3.color(color).darker(0.3) : color)
-      .attr('stroke', d => selectedValue === d.label ? '#1e293b' : 'none')
+      .attr('r', d => isSelected(selectedValue, d.label) ? 8 : 6)
+      .attr('fill', d => isSelected(selectedValue, d.label) ? d3.color(color).darker(0.3) : color)
+      .attr('stroke', d => isSelected(selectedValue, d.label) ? '#1e293b' : 'none')
       .attr('stroke-width', 2)
       .style('cursor', onClick ? 'pointer' : 'default')
       .on('mouseover', function(event, d) {
@@ -110,7 +111,7 @@ export default function LollipopChart({
           .style('top', (event.pageY - 10) + 'px');
       })
       .on('mouseout', function(event, d) {
-        d3.select(this).attr('r', selectedValue === d.label ? 8 : 6);
+        d3.select(this).attr('r', isSelected(selectedValue, d.label) ? 8 : 6);
         tooltip.style('opacity', 0);
       })
       .on('click', function(event, d) {

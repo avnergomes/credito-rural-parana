@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Search, ChevronUp, ChevronDown, Download } from 'lucide-react';
 import { formatCurrency, formatNumber, formatArea } from '../utils/format';
+import { isSelected } from '../utils/selection';
 
 export default function RankingTable({
   data,
@@ -168,7 +169,7 @@ export default function RankingTable({
             ) : (
               filteredData.map((item, index) => {
                 const itemName = item[nameKey] || item.nome || item.produto || '';
-                const isSelected = selectedRow && itemName === selectedRow;
+                const isSel = isSelected(selectedRow, itemName);
                 return (
                   <tr
                     key={index}
@@ -176,13 +177,13 @@ export default function RankingTable({
                     className={`
                       border-b border-dark-100 transition-colors
                       ${onRowClick ? 'cursor-pointer' : ''}
-                      ${isSelected ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-dark-50'}
+                      ${isSel ? 'bg-primary-50 hover:bg-primary-100' : 'hover:bg-dark-50'}
                     `}
                   >
                     {columns.map(col => (
                       <td
                         key={col}
-                        className={`py-3 px-2 text-sm ${columnConfig[col]?.align} ${isSelected ? 'font-medium' : ''}`}
+                        className={`py-3 px-2 text-sm ${columnConfig[col]?.align} ${isSel ? 'font-medium' : ''}`}
                       >
                         {formatValue(col, item[col], item, index)}
                       </td>

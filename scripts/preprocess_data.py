@@ -1,612 +1,291 @@
 #!/usr/bin/env python3
 """
-Process raw BCB/SICOR data into aggregated JSON files for the dashboard.
-Uses regional data (RegiaoUF endpoints) which have PR filter applied.
-All aggregations include ano/mes for filtering support.
+Microdados SICOR (data/raw/sicor) -> cubo do painel (dashboard/public/data).
+
+Saídas:
+- cubo/dims.json         dicionários das dimensões (município, empreendimento, programa...)
+- cubo/fato_<ANO>.json   tabela fato colunar, 1 linha por combinação de
+                         mes x municipio x empreendimento x programa x subprograma x fonte x porte
+- cubo/perfil.json       recorte estadual por sexo/tipo de beneficiário (sem município: LGPD)
+- aggregated.json        série estadual (metadata, byAno, byMes, byFinalidadeMes) para previsões
+
+Granularidade: 1 linha (REF_BACEN, NU_ORDEM) do SICOR = 1 contrato
+(reconciliado com a Olinda em 2025: 165.143 x 164.329).
+Município vem do complemento; ~27-31% das operações do PR não têm município
+publicado (concentrado em médio/grande produtor). Essas linhas ficam no cubo
+com municipio = 0 ("Não informado") para os totais baterem.
 """
 
+import csv
+import gzip
 import json
+import re
 import sys
-from pathlib import Path
-from datetime import datetime
 from collections import defaultdict
+from datetime import datetime
+from pathlib import Path
 
-import pandas as pd
-import numpy as np
+ROOT = Path(__file__).parent.parent
+RAW = ROOT / "data" / "raw" / "sicor"
+OUT = ROOT / "dashboard" / "public" / "data"
+CUBO = OUT / "cubo"
+MUNICIPIOS = Path(__file__).parent / "municipios_pr.json"
+UF = "PR"
+NI = "Não informado"
 
-# Directories
-SCRIPT_DIR = Path(__file__).parent
-RAW_DIR = SCRIPT_DIR.parent / "data" / "raw"
-OUTPUT_DIR = SCRIPT_DIR.parent / "dashboard" / "public" / "data"
-
-
-def load_raw_data(filename: str) -> list:
-    """Load raw JSON data file."""
-    filepath = RAW_DIR / f"{filename}.json"
-    if not filepath.exists():
-        print(f"  Warning: {filepath.name} not found")
-        return []
-
-    with open(filepath, "r", encoding="utf-8") as f:
-        data = json.load(f)
-        if isinstance(data, dict) and "value" in data:
-            return data["value"]
-        return data if isinstance(data, list) else []
+FINALIDADES = {  # rótulo do Empreendimento.csv -> código usado no painel e nas previsões
+    "custeio": "CUSTEIO", "investimento": "INVESTIMENTO",
+    "comercializacao": "COMERCIALIZACAO", "industrializacao": "INDUSTRIALIZACAO",
+}
+SEXO = {"1": "Feminino", "2": "Masculino"}
 
 
-def load_ibge_names() -> dict:
-    """Load IBGE municipality names mapping."""
-    filepath = RAW_DIR / "ibge_municipios.json"
-    if not filepath.exists():
-        print(f"  Warning: {filepath.name} not found")
-        return {}
-    with open(filepath, "r", encoding="utf-8") as f:
-        return json.load(f)
+# ---------------------------------------------------------------- leitura
+
+def _decode(raw: bytes) -> str:
+    # Os CSVs do BCB misturam linhas latin1 e utf-8 no mesmo arquivo.
+    # O "latin1" deles é na prática cp1252 (0x96 = travessão), não ISO-8859-1.
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        try:
+            return raw.decode("cp1252")
+        except UnicodeDecodeError:
+            return raw.decode("latin1")
 
 
-def get_programa_name(cd_programa) -> str:
-    """Map program code to name."""
-    cd = str(cd_programa).strip()
-    cd_int = int(cd) if cd.isdigit() else 0
-    if cd_int == 1 or cd == "0001":
-        return "PRONAF"
-    elif cd_int == 50 or cd == "0050":
-        return "PRONAMP"
-    else:
-        return "DEMAIS"
+def read_rows(path: Path):
+    """Itera dicts de um CSV do SICOR (.csv ou .gz; ';' ou ',')."""
+    opener = gzip.open if path.suffix == ".gz" else open
+    with opener(path, "rb") as f:
+        lines = (_decode(raw).rstrip("\r\n") for raw in f)
+        header = next(lines).lstrip("#")
+        delim = ";" if ";" in header else ","
+        cols = header.split(delim)
+        for row in csv.reader(lines, delimiter=delim):
+            yield dict(zip(cols, row))
 
 
-def process_regiao_uf() -> pd.DataFrame:
-    """Process RegiaoUF data - main aggregated data by year/month."""
-    data = load_raw_data("RegiaoUF")
-    if not data:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(data)
-    print(f"  RegiaoUF: {len(df)} records")
-
-    df = df.rename(columns={
-        "AnoEmissao": "ano",
-        "MesEmissao": "mes",
-        "QtdCusteio": "contratos_custeio",
-        "VlCusteio": "valor_custeio",
-        "QtdInvestimento": "contratos_invest",
-        "VlInvestimento": "valor_invest",
-        "QtdComercializacao": "contratos_comerc",
-        "VlComercializacao": "valor_comerc",
-        "QtdIndustrializacao": "contratos_indust",
-        "VlIndustrializacao": "valor_indust",
-    })
-
-    for col in df.columns:
-        if col not in ["uf", "nomeUF", "nomeRegiao", "cdRegiao"]:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    df["ano"] = df["ano"].astype(int)
-    df["mes"] = df["mes"].astype(int)
-    return df
+def norm(s: str) -> str:
+    """Chave sem acento/caixa para casar rótulos ('Comercialização' -> 'comercializacao')."""
+    trans = str.maketrans("áàãâéêíóôõúüç", "aaaaeeiooouuc")
+    return re.sub(r"\s+", " ", s.strip().lower().translate(trans))
 
 
-def process_produto_data() -> pd.DataFrame:
-    """Process all produto data (custeio, invest, comerc) into one DataFrame."""
-    dfs = []
-
-    # Custeio
-    data = load_raw_data("CusteioRegiaoUFProduto")
-    if data:
-        df = pd.DataFrame(data)
-        print(f"  CusteioRegiaoUFProduto: {len(df)} records")
-        df = df.rename(columns={
-            "AnoEmissao": "ano", "MesEmissao": "mes",
-            "nomeProduto": "produto", "VlCusteio": "valor",
-            "QtdCusteio": "contratos", "AreaCusteio": "area",
-        })
-        if "produto" in df.columns:
-            df["produto"] = df["produto"].str.strip('"')
-        df["finalidade"] = "CUSTEIO"
-        for col in ["ano", "mes", "valor", "contratos", "area"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-        dfs.append(df[["ano", "mes", "produto", "finalidade", "valor", "contratos", "area"]])
-
-    # Investimento
-    data = load_raw_data("InvestRegiaoUFProduto")
-    if data:
-        df = pd.DataFrame(data)
-        print(f"  InvestRegiaoUFProduto: {len(df)} records")
-        df = df.rename(columns={
-            "AnoEmissao": "ano", "MesEmissao": "mes",
-            "nomeProduto": "produto", "VlInvest": "valor",
-            "QtdInvest": "contratos",
-        })
-        if "produto" in df.columns:
-            df["produto"] = df["produto"].str.strip('"')
-        df["finalidade"] = "INVESTIMENTO"
-        df["area"] = 0
-        for col in ["ano", "mes", "valor", "contratos"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-        dfs.append(df[["ano", "mes", "produto", "finalidade", "valor", "contratos", "area"]])
-
-    # Comercializacao
-    data = load_raw_data("ComercRegiaoUFProduto")
-    if data:
-        df = pd.DataFrame(data)
-        print(f"  ComercRegiaoUFProduto: {len(df)} records")
-        df = df.rename(columns={
-            "AnoEmissao": "ano", "MesEmissao": "mes",
-            "nomeProduto": "produto", "VlComerc": "valor",
-            "QtdComerc": "contratos",
-        })
-        if "produto" in df.columns:
-            df["produto"] = df["produto"].str.strip('"')
-        df["finalidade"] = "COMERCIALIZACAO"
-        df["area"] = 0
-        for col in ["ano", "mes", "valor", "contratos"]:
-            if col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-        dfs.append(df[["ano", "mes", "produto", "finalidade", "valor", "contratos", "area"]])
-
-    if not dfs:
-        return pd.DataFrame()
-
-    return pd.concat(dfs, ignore_index=True)
+def code(s: str) -> str:
+    """Normaliza código numérico ('0056' e '56' viram '56'); vazio vira ''."""
+    s = s.strip().strip('"')
+    return str(int(s)) if s.isdigit() else s
 
 
-def process_programa() -> pd.DataFrame:
-    """Process ProgramaSubprogramaRegiaoUF data."""
-    data = load_raw_data("ProgramaSubprogramaRegiaoUF")
-    if not data:
-        return pd.DataFrame()
+# ---------------------------------------------------------------- dicionários
 
-    df = pd.DataFrame(data)
-    print(f"  ProgramaSubprogramaRegiaoUF: {len(df)} records")
+class Dim:
+    """Dicionário valor -> índice estável, na ordem de chegada."""
 
-    df = df.rename(columns={
-        "AnoEmissao": "ano",
-        "MesEmissao": "mes",
-        "cdPrograma": "cdPrograma",
-        "QtdCusteio": "contratos_custeio",
-        "VlCusteio": "valor_custeio",
-        "QtdInvestimento": "contratos_invest",
-        "VlInvestimento": "valor_invest",
-        "QtdComercializacao": "contratos_comerc",
-        "VlComercializacao": "valor_comerc",
-    })
+    def __init__(self, first: list | None = None):
+        self.items: list = []
+        self.index: dict = {}
+        for it in first or []:
+            self.get(it[0], it[1])
 
-    for col in df.columns:
-        if col not in ["nomeUF", "nomeRegiao"]:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    df["programa"] = df["cdPrograma"].apply(get_programa_name)
-    return df
+    def get(self, key, item=None) -> int:
+        if key not in self.index:
+            self.index[key] = len(self.items)
+            self.items.append(item if item is not None else key)
+        return self.index[key]
 
 
-def process_municipio_uf() -> pd.DataFrame:
-    """Process MunicipioUF data."""
-    data = load_raw_data("MunicipioUF")
-    if not data:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(data)
-    print(f"  MunicipioUF: {len(df)} records")
-
-    df = df.rename(columns={
-        "AnoEmissao": "ano",
-        "MesEmissao": "mes",
-        "Municipio": "municipio",
-        "codMunicIbge": "codIbge",
-        "cdPrograma": "cdPrograma",
-        "QtdCusteio": "contratos_custeio",
-        "VlCusteio": "valor_custeio",
-        "QtdInvestimento": "contratos_invest",
-        "VlInvestimento": "valor_invest",
-        "QtdComercializacao": "contratos_comerc",
-        "VlComercializacao": "valor_comerc",
-        "AreaCusteio": "area_custeio",
-        "AreaInvestimento": "area_invest",
-    })
-
-    numeric_cols = [
-        "contratos_custeio", "valor_custeio", "contratos_invest", "valor_invest",
-        "contratos_comerc", "valor_comerc", "area_custeio", "area_invest"
-    ]
-    for col in numeric_cols:
-        if col in df.columns:
-            df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
-    df["ano"] = pd.to_numeric(df["ano"], errors="coerce").fillna(0).astype(int)
-    df["mes"] = pd.to_numeric(df["mes"], errors="coerce").fillna(0).astype(int)
-
-    # Add programa field
-    if "cdPrograma" in df.columns:
-        df["programa"] = df["cdPrograma"].apply(get_programa_name)
-    else:
-        df["programa"] = "DEMAIS"
-
-    # Calculate totals
-    df["valor"] = df["valor_custeio"] + df["valor_invest"] + df["valor_comerc"]
-    df["contratos"] = df["contratos_custeio"] + df["contratos_invest"] + df["contratos_comerc"]
-    df["area"] = df["area_custeio"] + df["area_invest"]
-
-    return df
+def load_dominios() -> dict:
+    emp = {}
+    for r in read_rows(RAW / "Empreendimento.csv"):
+        fin = FINALIDADES.get(norm(r["FINALIDADE"]), r["FINALIDADE"].upper())
+        emp[r["CODIGO"].strip('"')] = (fin, r["ATIVIDADE"].strip(), r["PRODUTO"].strip(), r["VARIEDADE"].strip())
+    prog = {code(r["CODIGO"]): r["DESCRICAO"].strip() for r in read_rows(RAW / "Programa.csv")}
+    sub = {(code(r["CODIGO_PROGRAMA"]), code(r["CODIGO_SUBPROGRAMA"])): r["DESCRICAO_SUBPROGRAMA"].strip()
+           for r in read_rows(RAW / "Subprogramas.csv")}
+    fonte = {code(r["CODIGO"]): r["DESCRICAO"].strip() for r in read_rows(RAW / "FonteRecursos.csv")}
+    porte = {code(r["CODIGO"]): r["DESCRICAO"].strip() for r in read_rows(RAW / "CategoriaEmitente.csv")}
+    tipo = {code(r["CODIGO"]): r["DESCRICAO"].strip() for r in read_rows(RAW / "TipoBeneficiario.csv")}
+    return {"emp": emp, "prog": prog, "sub": sub, "fonte": fonte, "porte": porte, "tipo": tipo}
 
 
-def process_genero() -> dict:
-    """Process RegiaoUFGenero data by year/month."""
-    data = load_raw_data("RegiaoUFGenero")
-    if not data:
-        return {"totals": {"masculino": 0, "feminino": 0}, "byAnoMes": [], "totalArea": 0}
+def grupo_programa(cd: str) -> str:
+    return {"1": "PRONAF", "50": "PRONAMP"}.get(cd, "DEMAIS")
 
-    df = pd.DataFrame(data)
-    print(f"  RegiaoUFGenero: {len(df)} records")
 
-    df["ano"] = pd.to_numeric(df.get("AnoEmissao", 0), errors="coerce").fillna(0).astype(int)
-    df["mes"] = pd.to_numeric(df.get("MesEmissao", 0), errors="coerce").fillna(0).astype(int)
-    df["VlCusteio"] = pd.to_numeric(df.get("VlCusteio", 0), errors="coerce").fillna(0)
-    df["VlInvestimento"] = pd.to_numeric(df.get("VlInvestimento", 0), errors="coerce").fillna(0)
-    df["VlComercializacao"] = pd.to_numeric(df.get("VlComercializacao", 0), errors="coerce").fillna(0)
-    df["AreaCusteio"] = pd.to_numeric(df.get("AreaCusteio", 0), errors="coerce").fillna(0)
-    df["AreaInvestimento"] = pd.to_numeric(df.get("AreaInvestimento", 0), errors="coerce").fillna(0)
-    df["valor"] = df["VlCusteio"] + df["VlInvestimento"] + df["VlComercializacao"]
+# ---------------------------------------------------------------- etapas
 
-    # By year/month and gender
-    by_ano_mes = []
-    for (ano, mes, genero), group in df.groupby(["ano", "mes", "cdSexo"]):
-        genero_name = "feminino" if str(genero) == "1" else "masculino"
-        by_ano_mes.append({
-            "ano": int(ano),
-            "mes": int(mes),
-            "genero": genero_name,
-            "valor": float(group["valor"].sum()),
-        })
+def load_operacoes(anos: list[int]) -> tuple[list, dict]:
+    """Operações do PR. Retorna (linhas, chave 'ref;ordem' -> índice da linha)."""
+    ops, idx = [], {}
+    for ano in anos:
+        n0 = len(ops)
+        for r in read_rows(RAW / f"SICOR_OPERACAO_BASICA_ESTADO_{ano}.gz"):
+            if r["CD_ESTADO"] != UF:
+                continue
+            _, m, y = r["DT_EMISSAO"].split("/")
+            idx[f"{r['REF_BACEN']};{r['NU_ORDEM']}"] = len(ops)
+            ops.append((
+                int(y), int(m), r["REF_BACEN"], r["CD_EMPREENDIMENTO"].strip(),
+                code(r["CD_PROGRAMA"]), code(r["CD_SUBPROGRAMA"]), code(r["CD_FONTE_RECURSO"]),
+                code(r["CD_CATEG_EMITENTE"]),
+                float(r["VL_PARC_CREDITO"] or 0), float(r["VL_AREA_FINANC"] or 0),
+            ))
+        print(f"  {ano}: {len(ops) - n0:,} operações PR")
+    return ops, idx
 
-    # Totals
-    by_gender = df.groupby("cdSexo")["valor"].sum()
-    total_area = float(df["AreaCusteio"].sum() + df["AreaInvestimento"].sum())
 
+def load_municipios(idx: dict) -> dict:
+    """Índice da operação -> código IBGE (só os que o BCB publica)."""
+    mun = {}
+    for r in read_rows(RAW / "SICOR_COMPLEMENTO_OPERACAO_BASICA.gz"):
+        i = idx.get(f"{r['REF_BACEN']};{r['NU_ORDEM']}")
+        if i is not None and r["CD_IBGE_MUNICIPIO"].startswith("41"):
+            mun[i] = r["CD_IBGE_MUNICIPIO"]
+    return mun
+
+
+def load_mutuarios(refs: set) -> dict:
+    """REF_BACEN -> (sexo, tipo) do mutuário principal. CPF/CNPJ não é lido nem guardado."""
+    out = {}
+    for r in read_rows(RAW / "SICOR_MUTUARIOS.gz"):
+        ref = r["REF_BACEN"]
+        if r["CD_PRIMEIRO"] == "S" and ref in refs and ref not in out:
+            out[ref] = (r["CD_SEXO"].strip(), code(r["CD_TIPO_BENEFICIARIO"]))
+    return out
+
+
+def build_cubes(ops: list, mun: dict, mutu: dict, dom: dict, nomes_mun: dict) -> tuple:
+    d_mun = Dim([("", {"cod": "", "nome": NI})])
+    d_emp, d_prog, d_sub, d_fonte, d_porte = Dim(), Dim(), Dim(), Dim(), Dim()
+    d_fin, d_ativ, d_prod, d_var = Dim(), Dim(), Dim(), Dim()
+    d_sexo, d_tipo = Dim([("", NI)]), Dim([("", NI)])
+
+    fato = defaultdict(lambda: defaultdict(lambda: [0, 0.0, 0.0]))  # ano -> chave -> [n, vl, area]
+    perfil = defaultdict(lambda: [0, 0.0])
+    for i, (ano, mes, ref, emp, prog, sub, fonte, porte, vl, area) in enumerate(ops):
+        cod_mun = mun.get(i, "")
+        m = d_mun.get(cod_mun, {"cod": cod_mun, "nome": nomes_mun.get(cod_mun, cod_mun)})
+        fin, ativ, prod, var = dom["emp"].get(emp, ("NÃO IDENTIFICADO",) * 4)
+        e = d_emp.get(emp, [d_fin.get(fin), d_ativ.get(ativ), d_prod.get(prod), d_var.get(var)])
+        p = d_prog.get(prog, {"cod": prog, "nome": dom["prog"].get(prog, prog), "grupo": grupo_programa(prog)})
+        s = d_sub.get((prog, sub), {"cod": sub, "prog": p, "nome": dom["sub"].get((prog, sub), sub or NI)})
+        f = d_fonte.get(fonte, {"cod": fonte, "nome": dom["fonte"].get(fonte, fonte)})
+        po = d_porte.get(porte, dom["porte"].get(porte, porte or NI))
+        cell = fato[ano][(mes, m, e, p, s, f, po)]
+        cell[0] += 1
+        cell[1] += vl
+        cell[2] += area
+
+        sexo, tipo = mutu.get(ref, ("", ""))
+        sx = d_sexo.get(sexo, SEXO.get(sexo, NI))
+        tp = d_tipo.get(tipo, dom["tipo"].get(tipo, tipo))
+        pc = perfil[(ano, mes, p, d_emp.items[e][0], po, sx, tp)]
+        pc[0] += 1
+        pc[1] += vl
+
+    dims = {
+        "municipios": d_mun.items, "empreendimentos": d_emp.items,
+        "finalidades": d_fin.items, "atividades": d_ativ.items, "produtos": d_prod.items,
+        "variedades": d_var.items, "programas": d_prog.items, "subprogramas": d_sub.items,
+        "fontes": d_fonte.items, "portes": d_porte.items, "sexos": d_sexo.items, "tipos": d_tipo.items,
+    }
+    return dims, fato, perfil
+
+
+# ---------------------------------------------------------------- escrita
+
+FATO_COLS = ["mes", "mun", "emp", "prog", "sub", "fonte", "porte"]
+
+
+def columnar(cells: dict, key_cols: list, area: bool = True) -> dict:
+    cols = {c: [] for c in key_cols + ["n", "vl"] + (["area"] if area else [])}
+    for key, (n, *meas) in sorted(cells.items()):
+        for c, v in zip(key_cols, key):
+            cols[c].append(v)
+        cols["n"].append(n)
+        cols["vl"].append(round(meas[0]))  # R$ inteiros: precisão suficiente e ~40% menor
+        if area:
+            cols["area"].append(round(meas[1], 1))
+    return cols
+
+
+def write_json(path: Path, obj) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(obj, f, ensure_ascii=False, separators=(",", ":"))
+    print(f"  {path.name}: {path.stat().st_size / 1e6:.2f} MB")
+
+
+def serie_estadual(ops: list, dom: dict, cobertura: dict) -> dict:
+    by_mes = defaultdict(lambda: [0, 0.0, 0.0])
+    by_fin = defaultdict(lambda: [0, 0.0, 0.0])
+    for ano, mes, _, emp, *_, vl, area in ops:
+        fin = dom["emp"].get(emp, ("NÃO IDENTIFICADO",))[0]
+        for acc, k in ((by_mes, (ano, mes)), (by_fin, (ano, mes, fin))):
+            acc[k][0] += 1
+            acc[k][1] += vl
+            acc[k][2] += area
+    rec = lambda k, v, names: {**dict(zip(names, k)), "contratos": v[0], "valor": round(v[1], 2), "area": round(v[2], 2)}
+    by_ano = defaultdict(lambda: [0, 0.0, 0.0])
+    for (ano, _), v in by_mes.items():
+        by_ano[ano] = [a + b for a, b in zip(by_ano[ano], v)]
+    anos = sorted(by_ano)
+    ultimo = max(by_mes)
     return {
-        "totals": {
-            "masculino": float(by_gender.get("2", 0)),
-            "feminino": float(by_gender.get("1", 0)),
+        "metadata": {
+            "fonte": "BCB/SICOR microdados (www.bcb.gov.br/htms/sicor/DadosBrutos)",
+            "anoMin": anos[0], "anoMax": anos[-1],
+            "totalContratos": sum(v[0] for v in by_ano.values()),
+            "totalValor": round(sum(v[1] for v in by_ano.values()), 2),
+            "totalArea": round(sum(v[2] for v in by_ano.values()), 2),
+            "ultimaAtualizacao": datetime.now().strftime("%Y-%m-%d"),
+            "periodoMaisRecente": f"{ultimo[0]}-{ultimo[1]:02d}",
+            "coberturaMunicipio": cobertura,
         },
-        "byAnoMes": by_ano_mes,
-        "totalArea": total_area,
+        "byAno": [rec((a,), by_ano[a], ["ano"]) for a in anos],
+        "byMes": [rec(k, v, ["ano", "mes"]) for k, v in sorted(by_mes.items())],
+        "byFinalidadeMes": [rec(k, v, ["ano", "mes", "finalidade"]) for k, v in sorted(by_fin.items())],
     }
 
 
-# ============ AGGREGATION FUNCTIONS ============
+def main() -> None:
+    anos = sorted(int(p.stem.split("_")[-1].split(".")[0]) for p in RAW.glob("SICOR_OPERACAO_BASICA_ESTADO_*.gz"))
+    if not anos:
+        print(f"ERRO: nenhum microdado em {RAW}; rode fetch_data.py")
+        sys.exit(1)
+    print(f"Anos: {anos[0]}-{anos[-1]}")
+    dom = load_dominios()
+    nomes_mun = json.loads(MUNICIPIOS.read_text(encoding="utf-8"))
 
-def aggregate_time_series(df: pd.DataFrame, df_municipio: pd.DataFrame = None) -> dict:
-    """Aggregate by year and by month."""
-    if df.empty:
-        return {"byAno": [], "byMes": []}
+    ops, idx = load_operacoes(anos)
+    print("Complemento (município)...")
+    mun = load_municipios(idx)
+    del idx
+    print("Mutuários (sexo/tipo, sem CPF)...")
+    mutu = load_mutuarios({o[2] for o in ops})
 
-    df["valor"] = (
-        df.get("valor_custeio", 0) + df.get("valor_invest", 0) +
-        df.get("valor_comerc", 0) + df.get("valor_indust", 0)
-    )
-    df["contratos"] = (
-        df.get("contratos_custeio", 0) + df.get("contratos_invest", 0) +
-        df.get("contratos_comerc", 0) + df.get("contratos_indust", 0)
-    )
-
-    by_ano = df.groupby("ano").agg({"valor": "sum", "contratos": "sum"}).reset_index()
-    by_mes = df.groupby(["ano", "mes"]).agg({"valor": "sum", "contratos": "sum"}).reset_index()
-
-    # Get area from municipio data if available
-    if df_municipio is not None and not df_municipio.empty:
-        area_by_ano = df_municipio.groupby("ano")["area"].sum().reset_index()
-        area_by_mes = df_municipio.groupby(["ano", "mes"])["area"].sum().reset_index()
-        by_ano = by_ano.merge(area_by_ano, on="ano", how="left").fillna(0)
-        by_mes = by_mes.merge(area_by_mes, on=["ano", "mes"], how="left").fillna(0)
-    else:
-        by_ano["area"] = 0
-        by_mes["area"] = 0
-
-    return {
-        "byAno": by_ano.sort_values("ano").to_dict(orient="records"),
-        "byMes": by_mes.sort_values(["ano", "mes"]).to_dict(orient="records"),
-    }
-
-
-def aggregate_by_finalidade(df: pd.DataFrame) -> list:
-    """Aggregate by ano/mes/finalidade."""
-    if df.empty:
-        return []
-
-    result = []
-    for (ano, mes), group in df.groupby(["ano", "mes"]):
-        for fin, vcol, ccol in [
-            ("CUSTEIO", "valor_custeio", "contratos_custeio"),
-            ("INVESTIMENTO", "valor_invest", "contratos_invest"),
-            ("COMERCIALIZACAO", "valor_comerc", "contratos_comerc"),
-        ]:
-            result.append({
-                "ano": int(ano),
-                "mes": int(mes),
-                "finalidade": fin,
-                "valor": float(group[vcol].sum()),
-                "contratos": int(group[ccol].sum()),
-                "area": 0,
-            })
-    return result
-
-
-def aggregate_by_finalidade_programa(df: pd.DataFrame) -> list:
-    """Aggregate by ano/mes/finalidade with programa field for filtering."""
-    if df.empty:
-        return []
-
-    result = []
-    for (ano, mes, programa), group in df.groupby(["ano", "mes", "programa"]):
-        for fin, vcol, ccol in [
-            ("CUSTEIO", "valor_custeio", "contratos_custeio"),
-            ("INVESTIMENTO", "valor_invest", "contratos_invest"),
-            ("COMERCIALIZACAO", "valor_comerc", "contratos_comerc"),
-        ]:
-            valor = float(group[vcol].sum())
-            contratos = int(group[ccol].sum())
-            if valor > 0 or contratos > 0:
-                result.append({
-                    "ano": int(ano),
-                    "mes": int(mes),
-                    "programa": programa,
-                    "finalidade": fin,
-                    "valor": valor,
-                    "contratos": contratos,
-                    "area": 0,
-                })
-    return result
-
-
-def aggregate_by_programa(df: pd.DataFrame) -> list:
-    """Aggregate by ano/mes/programa."""
-    if df.empty:
-        return []
-
-    df["valor"] = df["valor_custeio"] + df["valor_invest"] + df["valor_comerc"]
-    df["contratos"] = df["contratos_custeio"] + df["contratos_invest"] + df["contratos_comerc"]
-
-    grouped = df.groupby(["ano", "mes", "programa"]).agg({
-        "valor": "sum", "contratos": "sum",
-    }).reset_index()
-    grouped["area"] = 0
-
-    return grouped.to_dict(orient="records")
-
-
-def aggregate_by_produto(df: pd.DataFrame) -> list:
-    """Aggregate by ano/mes/produto."""
-    if df.empty:
-        return []
-
-    grouped = df.groupby(["ano", "mes", "produto"]).agg({
-        "valor": "sum", "contratos": "sum", "area": "sum",
-    }).reset_index()
-
-    return grouped.to_dict(orient="records")
-
-
-def aggregate_by_municipio(df: pd.DataFrame, ibge_names: dict) -> list:
-    """Aggregate by ano/mes/municipio/programa."""
-    if df.empty:
-        return []
-
-    grouped = df.groupby(["ano", "mes", "codIbge", "municipio", "programa"]).agg({
-        "valor": "sum", "contratos": "sum", "area": "sum",
-    }).reset_index()
-
-    def get_name(row):
-        code = str(row["codIbge"])
-        return ibge_names.get(code, str(row["municipio"]).title())
-
-    grouped["name"] = grouped.apply(get_name, axis=1)
-
-    return grouped[["ano", "mes", "codIbge", "name", "programa", "valor", "contratos", "area"]].to_dict(orient="records")
-
-
-def aggregate_totals(data_list: list, group_key: str) -> list:
-    """Aggregate totals from ano/mes data."""
-    if not data_list:
-        return []
-
-    df = pd.DataFrame(data_list)
-    grouped = df.groupby(group_key).agg({
-        "valor": "sum",
-        "contratos": "sum",
-        "area": "sum" if "area" in df.columns else lambda x: 0,
-    }).reset_index()
-
-    grouped = grouped.sort_values("valor", ascending=False)
-
-    # Add rank for certain types
-    if group_key in ["name", "produto"]:
-        grouped["rank"] = range(1, len(grouped) + 1)
-
-    return grouped.to_dict(orient="records")
-
-
-def build_sankey_data(df_produto: pd.DataFrame, df_prog: pd.DataFrame) -> dict:
-    """Build Sankey chart data."""
-    nodes = []
-    links = []
-    node_map = {}
-
-    # Programs
-    for p in ["PRONAF", "PRONAMP", "DEMAIS"]:
-        node_map[f"prog_{p}"] = len(nodes)
-        nodes.append({"id": f"prog_{p}", "label": p})
-
-    # Finalidades
-    for f in ["CUSTEIO", "INVESTIMENTO", "COMERCIALIZACAO"]:
-        node_map[f"fin_{f}"] = len(nodes)
-        nodes.append({"id": f"fin_{f}", "label": f})
-
-    # Top products
-    if not df_produto.empty:
-        top_prods = df_produto.groupby("produto")["valor"].sum().nlargest(10).index.tolist()
-        for p in top_prods:
-            node_map[f"prod_{p}"] = len(nodes)
-            nodes.append({"id": f"prod_{p}", "label": p})
-
-    # Links: Programa -> Finalidade
-    if not df_prog.empty:
-        for fin, vcol in [("CUSTEIO", "valor_custeio"), ("INVESTIMENTO", "valor_invest"), ("COMERCIALIZACAO", "valor_comerc")]:
-            prog_vals = df_prog.groupby("programa")[vcol].sum()
-            for prog, val in prog_vals.items():
-                if val > 0:
-                    links.append({"source": f"prog_{prog}", "target": f"fin_{fin}", "value": float(val)})
-
-    # Links: Finalidade -> Produto
-    if not df_produto.empty:
-        for fin in ["CUSTEIO", "INVESTIMENTO", "COMERCIALIZACAO"]:
-            fin_data = df_produto[df_produto["finalidade"] == fin]
-            prod_vals = fin_data.groupby("produto")["valor"].sum()
-            for prod, val in prod_vals.items():
-                if f"prod_{prod}" in node_map and val > 0:
-                    links.append({"source": f"fin_{fin}", "target": f"prod_{prod}", "value": float(val)})
-
-    return {"nodes": nodes, "links": links}
-
-
-def build_bump_data(df: pd.DataFrame, ibge_names: dict, top_n: int = 20) -> list:
-    """Build bump chart data (ranking by year and programa)."""
-    if df.empty:
-        return []
-
-    # Group by year, municipality and programa
-    grouped = df.groupby(["ano", "codIbge", "municipio", "programa"]).agg({"valor": "sum"}).reset_index()
-
-    result = []
-    # Generate rankings per programa and year
-    for programa in grouped["programa"].unique():
-        prog_data = grouped[grouped["programa"] == programa]
-        for ano in prog_data["ano"].unique():
-            year_data = prog_data[prog_data["ano"] == ano].sort_values("valor", ascending=False).head(top_n)
-            for i, (_, row) in enumerate(year_data.iterrows()):
-                code = str(row["codIbge"])
-                name = ibge_names.get(code, str(row["municipio"]).title())
-                result.append({
-                    "id": name,
-                    "ano": int(ano),
-                    "programa": programa,
-                    "rank": i + 1,
-                    "valor": float(row["valor"]),
-                })
-
-    return result
-
-
-def main():
-    """Main processing function."""
-    print("=" * 60)
-    print("BCB/SICOR Data Processor - Full Granularity")
-    print(f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 60)
-
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
-    print("\nLoading raw data...")
-    df_regiao = process_regiao_uf()
-    df_produto = process_produto_data()
-    df_prog = process_programa()
-    df_municipio = process_municipio_uf()
-    ibge_names = load_ibge_names()
-    genero_data = process_genero()
-
-    if df_regiao.empty:
-        # Falhar o pipeline: seguir adiante gravaria um dashboard vazio
-        # e o workflow terminaria "verde" sem dados.
-        print("ERROR: No RegiaoUF data found.")
+    cobertura = defaultdict(lambda: [0, 0])
+    for i, o in enumerate(ops):
+        cobertura[o[0]][0 if i in mun else 1] += 1
+    cob = {str(a): round(c / (c + s), 4) for a, (c, s) in sorted(cobertura.items())}
+    print(f"  cobertura municipal por ano: {cob}")
+    if len(mun) / len(ops) < 0.5:  # queda brusca = join quebrado ou mudança de layout no BCB
+        print("ERRO: menos de 50% das operações com município; verifique o complemento")
         sys.exit(1)
 
-    print(f"  IBGE names: {len(ibge_names)} municipalities")
-
-    # Metadata
-    ano_min = int(df_regiao["ano"].min())
-    ano_max = int(df_regiao["ano"].max())
-    total_valor = float(
-        df_regiao["valor_custeio"].sum() + df_regiao["valor_invest"].sum() +
-        df_regiao["valor_comerc"].sum() + df_regiao["valor_indust"].sum()
-    )
-    total_contratos = int(
-        df_regiao["contratos_custeio"].sum() + df_regiao["contratos_invest"].sum() +
-        df_regiao["contratos_comerc"].sum() + df_regiao["contratos_indust"].sum()
-    )
-
-    print(f"\n  Period: {ano_min} - {ano_max}")
-    print(f"  Total value: R$ {total_valor/1e9:.2f} bi")
-    print(f"  Total contracts: {total_contratos:,}")
-
-    # Generate all aggregations with ano/mes
-    print("\nGenerating aggregations...")
-
-    time_series = aggregate_time_series(df_regiao.copy(), df_municipio.copy())
-    by_finalidade = aggregate_by_finalidade_programa(df_prog.copy())
-    by_programa = aggregate_by_programa(df_prog.copy())
-    by_produto = aggregate_by_produto(df_produto.copy())
-    by_municipio = aggregate_by_municipio(df_municipio.copy(), ibge_names)
-
-    # Totals (for initial display)
-    finalidade_totals = aggregate_totals(by_finalidade, "finalidade")
-    programa_totals = aggregate_totals(by_programa, "programa")
-    produto_totals = aggregate_totals(by_produto, "produto")[:50]  # Top 50
-    municipio_totals = aggregate_totals(by_municipio, "name")
-
-    # Add rank to municipio totals
-    for i, m in enumerate(municipio_totals):
-        m["rank"] = i + 1
-
-    # Sankey and bump
-    sankey = build_sankey_data(df_produto, df_prog)
-    bump = build_bump_data(df_municipio, ibge_names)
-
-    # Build output
-    aggregated = {
-        "metadata": {
-            "anoMin": ano_min,
-            "anoMax": ano_max,
-            "totalMunicipios": len(municipio_totals),
-            "totalContratos": total_contratos,
-            "totalValor": total_valor,
-            "totalArea": genero_data["totalArea"],
-            "ultimaAtualizacao": datetime.now().strftime("%Y-%m-%d"),
-            # Mes mais recente DENTRO do ultimo ano (mes.max() global indicava
-            # ex.: 2026-12 quando o dado real ia so ate 2026-01)
-            "periodoMaisRecente": f"{ano_max}-{int(df_regiao.loc[df_regiao['ano'] == ano_max, 'mes'].max()):02d}",
-        },
-        "filters": {
-            "finalidades": ["CUSTEIO", "INVESTIMENTO", "COMERCIALIZACAO"],
-            "programas": ["PRONAF", "PRONAMP", "DEMAIS"],
-        },
-        # Time series
-        "byAno": time_series["byAno"],
-        "byMes": time_series["byMes"],
-        # Granular data (with ano/mes for filtering)
-        "byFinalidade": by_finalidade,
-        "byPrograma": by_programa,
-        "byProduto": by_produto,
-        "byMunicipio": by_municipio,
-        # Totals (pre-aggregated for fast initial load)
-        "finalidadeTotals": finalidade_totals,
-        "programaTotals": programa_totals,
-        "produtoTotals": produto_totals,
-        "municipioTotals": municipio_totals,
-        # Other
-        "byGenero": genero_data,
-        "sankey": sankey,
-        "bump": bump,
-    }
-
-    # Save
-    print("\nSaving aggregated.json...")
-    output_path = OUTPUT_DIR / "aggregated.json"
-    with open(output_path, "w", encoding="utf-8") as f:
-        json.dump(aggregated, f, ensure_ascii=False)
-
-    print(f"  Saved: {output_path.stat().st_size / 1024:.1f} KB")
-    print(f"\nCompleted at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    dims, fato, perfil = build_cubes(ops, mun, mutu, dom, nomes_mun)
+    dims["anos"] = sorted(fato)
+    print("Gravando...")
+    write_json(CUBO / "dims.json", dims)
+    for ano, cells in fato.items():
+        write_json(CUBO / f"fato_{ano}.json", columnar(cells, FATO_COLS))
+    perf = columnar(perfil, ["ano", "mes", "prog", "fin", "porte", "sexo", "tipo"], area=False)
+    write_json(CUBO / "perfil.json", perf)
+    serie = serie_estadual(ops, dom, cob)
+    serie["metadata"]["totalMunicipios"] = len(dims["municipios"]) - 1  # sem "Não informado"
+    write_json(OUT / "aggregated.json", serie)
 
 
 if __name__ == "__main__":

@@ -16,16 +16,17 @@ export default function Footer() {
             <ul className="space-y-1.5 text-xs text-dark-400">
               <li>
                 <a
-                  href="https://olinda.bcb.gov.br/olinda/servico/SICOR/versao/v2/swagger-ui3"
+                  href="https://www.bcb.gov.br/estabilidadefinanceira/tabelas-credito-rural-proagro"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-primary-400 transition-colors inline-flex items-center gap-1"
                 >
-                  SICOR - Banco Central do Brasil
+                  SICOR (microdados) - Banco Central do Brasil
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </li>
               <li>Sistema de Operações do Crédito Rural e do Proagro</li>
+              <li>Operações sem município publicado pelo BCB entram como &quot;Não informado&quot;.</li>
             </ul>
             <p className="text-xs text-dark-500">Filtragem: Paraná (PR), 2013-2026</p>
           </div>

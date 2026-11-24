@@ -1,6 +1,7 @@
 import { useRef, useEffect, useMemo, useState } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency } from '../utils/format';
+import { isSelected } from '../utils/selection';
 
 // ATLAS-PALETTE-V1 — Okabe-Ito daltonic-safe categorical
 const COLORS = ['#0072B2','#D55E00','#009E73','#E69F00','#CC79A7','#56B4E9','#F0E442','#2a2419'];
@@ -125,15 +126,15 @@ export default function BumpChart({ data, title, limit = 20, onEntityClick, sele
         .y(d => yScale(d.rank))
         .curve(d3.curveMonotoneX);
 
-      const isSelected = selectedEntity === entity;
+      const isSel = isSelected(selectedEntity, entity);
 
       g.append('path')
         .datum(entityData)
         .attr('fill', 'none')
         .attr('stroke', colorScale(entity))
-        .attr('stroke-width', isSelected ? 4 : 2.5)
+        .attr('stroke-width', isSel ? 4 : 2.5)
         .attr('stroke-linecap', 'round')
-        .attr('opacity', isSelected ? 1 : (selectedEntity ? 0.3 : 0.7))
+        .attr('opacity', isSel ? 1 : (selectedEntity?.length ? 0.3 : 0.7))
         .attr('d', line);
 
       // Draw circles at each point (use index instead of name to avoid CSS selector issues)
@@ -142,11 +143,11 @@ export default function BumpChart({ data, title, limit = 20, onEntityClick, sele
         .join('circle')
         .attr('cx', d => xScale(d.year))
         .attr('cy', d => yScale(d.rank))
-        .attr('r', isSelected ? 7 : 5)
+        .attr('r', isSel ? 7 : 5)
         .attr('fill', colorScale(entity))
-        .attr('stroke', isSelected ? '#1e293b' : 'white')
-        .attr('stroke-width', isSelected ? 3 : 2)
-        .attr('opacity', isSelected ? 1 : (selectedEntity ? 0.4 : 1))
+        .attr('stroke', isSel ? '#1e293b' : 'white')
+        .attr('stroke-width', isSel ? 3 : 2)
+        .attr('opacity', isSel ? 1 : (selectedEntity?.length ? 0.4 : 1))
         .style('cursor', onEntityClick ? 'pointer' : 'default')
         .on('mouseover', function(event, d) {
           d3.select(this).attr('r', 7);
@@ -163,7 +164,7 @@ export default function BumpChart({ data, title, limit = 20, onEntityClick, sele
             .style('top', (event.pageY - 10) + 'px');
         })
         .on('mouseout', function() {
-          d3.select(this).attr('r', isSelected ? 7 : 5);
+          d3.select(this).attr('r', isSel ? 7 : 5);
           tooltip.style('opacity', 0);
         })
         .on('click', function(event, d) {

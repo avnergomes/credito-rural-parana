@@ -50,19 +50,30 @@ export default function KpiCards({ totals }) {
       bgColor: 'bg-earth-50',
     },
     {
-      icon: totals.yoyChange >= 0 ? TrendingUp : TrendingDown,
+      icon: totals.yoyChange == null || totals.yoyChange >= 0 ? TrendingUp : TrendingDown,
       label: 'Variação Anual',
       value: totals.yoyChange !== null ? formatPercent(totals.yoyChange, 1) : 'N/D',
-      color: totals.yoyChange >= 0 ? 'text-green-600' : 'text-red-600',
-      bgColor: totals.yoyChange >= 0 ? 'bg-green-50' : 'bg-red-50',
+      color: totals.yoyChange == null ? 'text-dark-500' : totals.yoyChange >= 0 ? 'text-green-600' : 'text-red-600',
+      bgColor: totals.yoyChange == null ? 'bg-dark-50' : totals.yoyChange >= 0 ? 'bg-green-50' : 'bg-red-50',
+      title: 'Último ano do recorte contra o anterior, nos mesmos meses (o ano corrente ainda está incompleto).',
+    },
+    {
+      icon: MapPin,
+      label: 'Valor com município informado',
+      value: totals.coberturaMunicipio != null ? formatPercent(totals.coberturaMunicipio * 100, 0) : 'N/D',
+      color: 'text-dark-600',
+      bgColor: 'bg-dark-50',
+      title: 'O BCB não publica o município de parte das operações (sobretudo médio e grande produtor). '
+        + 'Essas operações entram em todos os totais como "Não informado", mas ficam fora do mapa.',
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
       {cards.map((card, index) => (
         <div
           key={index}
+          title={card.title}
           className="bg-white rounded-xl shadow-card p-4 hover:shadow-soft transition-shadow"
         >
           <div className="flex items-center gap-3">

@@ -20,6 +20,7 @@ const COLORS = {
   custeio: ATLAS_CATEGORICAL[0],         // azul #0072B2
   investimento: ATLAS_CATEGORICAL[3],    // laranja #E69F00
   comercializacao: ATLAS_CATEGORICAL[2], // verde-azulado #009E73
+  industrializacao: ATLAS_CATEGORICAL[4], // roxo-avermelhado #CC79A7
   total: ATLAS_CATEGORICAL[7],           // atlas ink
 };
 
@@ -41,18 +42,22 @@ export default function TimeSeriesChart({
 
     data.forEach(item => {
       // Se granularidade é anual, agrupa só por ano
+      const sem = item.mes > 6 ? 2 : 1;
       const key = granularidade === 'mensal' && item.mes
         ? `${item.ano}-${String(item.mes).padStart(2, '0')}`
-        : String(item.ano);
+        : granularidade === 'semestral' && item.mes
+          ? `${item.ano}-S${sem}`
+          : String(item.ano);
 
       if (!grouped[key]) {
         grouped[key] = {
           periodo: key,
           ano: item.ano,
-          mes: granularidade === 'mensal' ? item.mes : null,
+          mes: granularidade === 'mensal' ? item.mes : granularidade === 'semestral' ? sem * 6 : null,
           custeio: 0,
           investimento: 0,
           comercializacao: 0,
+          industrializacao: 0,
           total: 0,
         };
       }
@@ -66,6 +71,8 @@ export default function TimeSeriesChart({
         grouped[key].investimento += valor;
       } else if (finalidade.includes('comercializa')) {
         grouped[key].comercializacao += valor;
+      } else if (finalidade.includes('industrializa')) {
+        grouped[key].industrializacao += valor;
       }
 
       grouped[key].total += valor;
@@ -78,6 +85,10 @@ export default function TimeSeriesChart({
   }, [data, granularidade]);
 
   const formatLabel = (value) => {
+    if (typeof value === 'string' && value.includes('-S')) {
+      const [ano, s] = value.split('-S');
+      return `${s}º sem/${ano.slice(2)}`;
+    }
     if (typeof value === 'string' && value.includes('-')) {
       const [ano, mes] = value.split('-');
       const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
@@ -186,6 +197,18 @@ export default function TimeSeriesChart({
                 stackId={stacked ? '1' : undefined}
                 stroke={COLORS.comercializacao}
                 fill={COLORS.comercializacao}
+                fillOpacity={0.6}
+              />
+            )}
+
+            {tipo === 'todos' && chartData.some((d) => d.industrializacao > 0) && (
+              <Area
+                type="monotone"
+                dataKey="industrializacao"
+                name="Industrialização"
+                stackId={stacked ? '1' : undefined}
+                stroke={COLORS.industrializacao}
+                fill={COLORS.industrializacao}
                 fillOpacity={0.6}
               />
             )}

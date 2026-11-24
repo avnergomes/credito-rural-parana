@@ -2,6 +2,7 @@
 import { useRef, useEffect, useMemo } from 'react';
 import * as d3 from 'd3';
 import { formatCurrency } from '../utils/format';
+import { isSelected } from '../utils/selection';
 
 const COLORS = {
   'PRONAF': '#CC79A7',
@@ -91,14 +92,14 @@ export default function TreemapChart({ data, title, onProgramaClick, onFinalidad
       .attr('height', d => d.y1 - d.y0)
       .attr('rx', 4)
       .attr('opacity', d => {
-        const isSelected = (selectedPrograma && d.data.programa === selectedPrograma) ||
-                          (selectedFinalidade && d.data.name === selectedFinalidade);
-        return isSelected ? 1 : 0.85;
+        const isSel = isSelected(selectedPrograma, d.data.programa) ||
+                          isSelected(selectedFinalidade, d.data.name);
+        return isSel ? 1 : 0.85;
       })
       .attr('stroke', d => {
-        const isSelected = (selectedPrograma && d.data.programa === selectedPrograma) ||
-                          (selectedFinalidade && d.data.name === selectedFinalidade);
-        return isSelected ? '#1e293b' : 'none';
+        const isSel = isSelected(selectedPrograma, d.data.programa) ||
+                          isSelected(selectedFinalidade, d.data.name);
+        return isSel ? '#1e293b' : 'none';
       })
       .attr('stroke-width', 2)
       .style('cursor', 'pointer')
@@ -116,9 +117,9 @@ export default function TreemapChart({ data, title, onProgramaClick, onFinalidad
           .style('top', (event.pageY - 10) + 'px');
       })
       .on('mouseout', function(event, d) {
-        const isSelected = (selectedPrograma && d.data.programa === selectedPrograma) ||
-                          (selectedFinalidade && d.data.name === selectedFinalidade);
-        d3.select(this).attr('opacity', isSelected ? 1 : 0.85);
+        const isSel = isSelected(selectedPrograma, d.data.programa) ||
+                          isSelected(selectedFinalidade, d.data.name);
+        d3.select(this).attr('opacity', isSel ? 1 : 0.85);
         tooltip.style('opacity', 0);
       })
       .on('click', function(event, d) {
